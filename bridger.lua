@@ -1,6 +1,6 @@
 -- ================================================
 -- Bridger: WESTERN | Saint Corpse Collector
--- PUBLIX THEME Edition | Q = script pause · P = unload · RightShift = menu
+-- PUBLIX THEME Edition | Q = script pause · P = unload · Insert = menu
 -- ================================================
 
 repeat task.wait(0.5) until game:IsLoaded()
@@ -41,7 +41,7 @@ local CLOSE_HIT_DIST    = 8
 local MENU_BLUR_SIZE    = 10
 local toggleKey         = Enum.KeyCode.Q       -- pause / resume script logic
 local unloadKey         = Enum.KeyCode.P
-local menuToggleKey     = Enum.KeyCode.RightShift -- show / hide entire menu UI
+local menuToggleKey     = Enum.KeyCode.Insert -- show / hide entire menu UI (RightShift conflicts with many games)
 
 -- ============================================
 -- PUBLIX THEME (+ dark “script hub” shell like Cerberus-style UIs)
@@ -121,6 +121,11 @@ end
 
 local menuGuiOpen      = true
 local menuGuiWasMinimized = false
+local lastMenuToggleT  = 0
+
+-- Window size (declared before building UI so the frame is never stuck at 0×0 if a later line errors)
+local TARGET_WIN_SIZE = UDim2.new(0, 620, 0, 400)
+local minimized       = false
 
 -- Forward declarations (must exist as upvalues before any closure references them)
 local runStartupScan
@@ -429,10 +434,12 @@ local Window = Instance.new("Frame")
 Window.Name = "Window"
 Window.AnchorPoint = Vector2.new(0.5, 0.5)
 Window.Position = UDim2.new(0.5, 0, 0.5, 0)
-Window.Size = UDim2.new(0, 0, 0, 0) -- animated in
+-- Full size immediately; splash (ZIndex 100+) covers this until it closes — avoids invisible 0×0 window
+Window.Size = TARGET_WIN_SIZE
 Window.BackgroundColor3 = THEME.ShellWindow
 Window.BorderSizePixel = 0
 Window.ClipsDescendants = true
+Window.Visible = true
 Window.Parent = ScreenGui
 corner(Window, 22)
 
@@ -723,7 +730,6 @@ local function createTab(name, iconText)
     page.ScrollBarImageColor3 = THEME.PublixGreen
     page.ScrollBarImageTransparency = 0.3
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
-    page.AutomaticCanvasSize = Enum.AutomaticSize.None
     page.Visible = false
     page.Parent = ContentArea
     padding(page, 18)
@@ -734,10 +740,16 @@ local function createTab(name, iconText)
     list.Parent = page
 
     local function updatePageCanvas()
-        local h = list.AbsoluteContentSize.Y
-        page.CanvasSize = UDim2.new(0, 0, 0, math.max(math.ceil(h) + 32, 64))
+        local ok, h = pcall(function()
+            return list.AbsoluteContentSize.Y
+        end)
+        if ok and type(h) == "number" then
+            page.CanvasSize = UDim2.new(0, 0, 0, math.max(math.ceil(h) + 32, 64))
+        end
     end
-    list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updatePageCanvas)
+    pcall(function()
+        list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updatePageCanvas)
+    end)
     task.defer(updatePageCanvas)
 
     local tab = { Button = btn, Label = lbl, Icon = icon, Page = page, Indicator = indicator, Stroke = btnStroke }
@@ -761,13 +773,17 @@ local function createTab(name, iconText)
 end
 
 local function refreshAllTabCanvases()
-    for _, t in ipairs(tabs) do
-        local listLayout = t.Page:FindFirstChildOfClass("UIListLayout")
-        if listLayout then
-            local h = listLayout.AbsoluteContentSize.Y
-            t.Page.CanvasSize = UDim2.new(0, 0, 0, math.max(math.ceil(h) + 32, 64))
+    pcall(function()
+        for _, t in ipairs(tabs) do
+            local listLayout = t.Page:FindFirstChildOfClass("UIListLayout")
+            if listLayout then
+                local h = listLayout.AbsoluteContentSize.Y
+                if type(h) == "number" then
+                    t.Page.CanvasSize = UDim2.new(0, 0, 0, math.max(math.ceil(h) + 32, 64))
+                end
+            end
         end
-    end
+    end)
 end
 
 -- ============================================
@@ -1249,9 +1265,6 @@ end)
 -- ============================================
 -- WINDOW ANIMATIONS
 -- ============================================
-local TARGET_WIN_SIZE = UDim2.new(0, 620, 0, 400)
-local minimized = false
-
 local function setMenuBackdropExpanded(expanded)
     if expanded then
         Backdrop.Visible = true
@@ -1269,9 +1282,8 @@ local function setMenuBackdropExpanded(expanded)
 end
 
 task.spawn(function()
-    task.wait(2.0) -- wait for splash
-    if menuGuiOpen then
-        tween(Window, BOUNCE, {Size = TARGET_WIN_SIZE})
+    task.wait(2.0) -- after splash; window is already full size
+    if menuGuiOpen and HeaderLogo.Parent then
         tween(HeaderLogo, SMOOTH, {ImageTransparency = 0})
         task.defer(refreshAllTabCanvases)
     end
@@ -1401,6 +1413,9 @@ table.insert(connections, UIS.InputBegan:Connect(function(i, gp)
     if gp then return end
     if i.UserInputType ~= Enum.UserInputType.Keyboard then return end
     if i.KeyCode == menuToggleKey then
+        local now = os.clock()
+        if now - lastMenuToggleT < 0.25 then return end
+        lastMenuToggleT = now
         menuGuiOpen = not menuGuiOpen
         syncMenuGuiVisibility()
         return
@@ -1784,7 +1799,7 @@ end)
 -- ENTRY POINT
 -- ============================================
 setStatus("Waiting for Play click...")
-print("[Script] Loaded! Q = toggle | P = unload")
+print("[Script] Loaded! Q = pause | P = unload | Insert = menu")
 notify(
     "Publix Edition",
     "Keys: " .. toggleKey.Name .. " = pause script · " .. unloadKey.Name .. " = unload · " .. menuToggleKey.Name .. " = hide/show menu.",
