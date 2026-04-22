@@ -1,6 +1,6 @@
 -- ================================================
 -- Bridger: WESTERN | Saint Corpse Collector
--- PUBLIX THEME Edition | Q = script pause · P = unload · RightShift = menu
+-- PUBLIX THEME Edition | Q = script pause · P = unload · Insert = open/close menu
 -- ================================================
 
 repeat task.wait(0.5) until game:IsLoaded()
@@ -41,7 +41,7 @@ local CLOSE_HIT_DIST    = 8
 local MENU_BLUR_SIZE    = 10
 local toggleKey         = Enum.KeyCode.Q       -- pause / resume script logic
 local unloadKey         = Enum.KeyCode.P
-local menuToggleKey     = Enum.KeyCode.RightShift -- show / hide entire menu UI
+local menuToggleKey     = Enum.KeyCode.Insert -- show / hide entire menu UI (change in Keybinds tab)
 
 -- ============================================
 -- PUBLIX THEME (+ dark “script hub” shell like Cerberus-style UIs)
@@ -121,6 +121,8 @@ end
 
 local menuGuiOpen      = true
 local menuGuiWasMinimized = false
+local lastMenuToggleClock = 0
+local MENU_TOGGLE_DEBOUNCE = 0.22
 
 -- Forward declarations (must exist as upvalues before any closure references them)
 local runStartupScan
@@ -573,13 +575,33 @@ TabDivider.Position = UDim2.new(1, 0, 0, 0)
 TabDivider.Size = UDim2.new(0, 1, 1, 0)
 TabDivider.BackgroundColor3 = THEME.ShellLine
 TabDivider.BorderSizePixel = 0
+TabDivider.ZIndex = 10
 TabDivider.Parent = TabBar
+
+padding(TabBar, 12)
+
+local TabScroll = Instance.new("ScrollingFrame")
+TabScroll.Name = "TabScroll"
+TabScroll.Position = UDim2.new(0, 0, 0, 0)
+TabScroll.Size = UDim2.new(1, 0, 1, 0)
+TabScroll.BackgroundTransparency = 1
+TabScroll.BorderSizePixel = 0
+TabScroll.ZIndex = 2
+TabScroll.ScrollBarThickness = 6
+TabScroll.ScrollBarImageColor3 = THEME.PublixGreen
+TabScroll.ScrollBarImageTransparency = 0.35
+TabScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+TabScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+TabScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+TabScroll.ClipsDescendants = true
+TabScroll.Parent = TabBar
 
 local TabList = Instance.new("UIListLayout")
 TabList.Padding = UDim.new(0, 4)
 TabList.SortOrder = Enum.SortOrder.LayoutOrder
-TabList.Parent = TabBar
-padding(TabBar, 12)
+TabList.HorizontalAlignment = Enum.HorizontalAlignment.Left
+TabList.VerticalAlignment = Enum.VerticalAlignment.Top
+TabList.Parent = TabScroll
 
 local ContentArea = Instance.new("Frame")
 ContentArea.Name = "Content"
@@ -636,14 +658,16 @@ local function setActiveTab(tabData)
 end
 
 local function createTab(name, iconText)
+    local tabIndex = #tabs + 1
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 38)
+    btn.Size = UDim2.new(1, -4, 0, 38)
     btn.BackgroundColor3 = THEME.ShellCard
     btn.BackgroundTransparency = 0.9
     btn.AutoButtonColor = false
     btn.Text = ""
     btn.ZIndex = 4
-    btn.Parent = TabBar
+    btn.LayoutOrder = tabIndex
+    btn.Parent = TabScroll
     corner(btn, 10)
     local btnStroke = stroke(btn, THEME.ShellLine, 1)
     btnStroke.Transparency = 1
@@ -937,10 +961,10 @@ end
 -- ============================================
 -- BUILD TABS
 -- ============================================
-local MainTab  = createTab("Main", "[M]")
-local StandTab = createTab("Stands", "[S]")
+local MainTab    = createTab("Main", "[M]")
 local KeybindTab = createTab("Keybinds", "[K]")
-local InfoTab  = createTab("About", "[I]")
+local StandTab   = createTab("Stands", "[S]")
+local InfoTab    = createTab("About", "[I]")
 
 addSection(MainTab, "Info")
 local StatusElement = addLabel(MainTab, "Status: Waiting...")
@@ -992,25 +1016,17 @@ end)
 
 addButton(MainTab, "Unload Script", function() unloadScript() end)
 
-addSection(StandTab, "Stand filter")
-addWrappedNote(StandTab, "Turn stands ON to count as wanted when you roll. OFF = unwanted (auto-wipe can still apply).")
+addSection(KeybindTab, "Open / close menu")
+addWrappedNote(KeybindTab, "Toggles the whole Bridger window (backdrop + UI). Change the key below if Insert conflicts with your game.")
 
-addSection(StandTab, "Select stands")
-for _, stand in ipairs(WANTED_STANDS) do
-    addToggle(StandTab, stand, selectedStands[stand], function(on)
-        selectedStands[stand] = on
-        refreshSelectedStandsSummary()
-    end)
-end
-
-addSection(KeybindTab, "What is bound")
+addSection(KeybindTab, "Current keys")
 local KeybindReadout = addWrappedNote(KeybindTab, "")
 
 local function refreshKeybindReadout()
     KeybindReadout:Set(table.concat({
-        "• Script pause / resume  →  " .. toggleKey.Name,
-        "• Unload script          →  " .. unloadKey.Name,
-        "• Show / hide menu UI    →  " .. menuToggleKey.Name,
+        "• Open / close menu     →  " .. menuToggleKey.Name,
+        "• Script pause / resume →  " .. toggleKey.Name,
+        "• Unload script         →  " .. unloadKey.Name,
     }, "\n"))
 end
 
@@ -1021,7 +1037,12 @@ local function bindKey(kind)
     if keybindCaptureActive then return end
     keybindCaptureActive = true
 
-    notify("Keybind capture", "Press a keyboard key for: " .. kind, 3)
+    local captureLabel = ({
+        ScriptToggle = "script pause / resume",
+        Unload = "unload script",
+        MenuToggle = "open / close menu",
+    })[kind] or kind
+    notify("Keybind capture", "Press a keyboard key for: " .. captureLabel, 3)
     local conn
     conn = UIS.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
@@ -1039,23 +1060,34 @@ local function bindKey(kind)
             notify("Keybind updated", "Unload key: " .. unloadKey.Name, 3)
         elseif kind == "MenuToggle" then
             menuToggleKey = chosen
-            notify("Keybind updated", "Menu show/hide key: " .. menuToggleKey.Name, 3)
+            notify("Keybind updated", "Open/close menu key: " .. menuToggleKey.Name, 3)
         end
         refreshKeybindReadout()
     end)
 end
 
+addButton(KeybindTab, "Set open / close menu key", function()
+    bindKey("MenuToggle")
+end)
 addButton(KeybindTab, "Set script pause key", function()
     bindKey("ScriptToggle")
 end)
 addButton(KeybindTab, "Set unload key", function()
     bindKey("Unload")
 end)
-addButton(KeybindTab, "Set menu show / hide key", function()
-    bindKey("MenuToggle")
-end)
 
 refreshKeybindReadout()
+
+addSection(StandTab, "Stand filter")
+addWrappedNote(StandTab, "Turn stands ON to count as wanted when you roll. OFF = unwanted (auto-wipe can still apply).")
+
+addSection(StandTab, "Select stands")
+for _, stand in ipairs(WANTED_STANDS) do
+    addToggle(StandTab, stand, selectedStands[stand], function(on)
+        selectedStands[stand] = on
+        refreshSelectedStandsSummary()
+    end)
+end
 
 addSection(InfoTab, "About")
 addLabel(InfoTab, "Bridger · Publix Edition")
@@ -1340,6 +1372,9 @@ table.insert(connections, UIS.InputBegan:Connect(function(i, gp)
     if gp then return end
     if i.UserInputType ~= Enum.UserInputType.Keyboard then return end
     if i.KeyCode == menuToggleKey then
+        local now = os.clock()
+        if now - lastMenuToggleClock < MENU_TOGGLE_DEBOUNCE then return end
+        lastMenuToggleClock = now
         menuGuiOpen = not menuGuiOpen
         syncMenuGuiVisibility()
         return
@@ -1723,10 +1758,10 @@ end)
 -- ENTRY POINT
 -- ============================================
 setStatus("Waiting for Play click...")
-print("[Script] Loaded! Q = toggle | P = unload")
+print("[Script] Loaded! Q = toggle | P = unload | " .. menuToggleKey.Name .. " = menu")
 notify(
     "Publix Edition",
-    "Keys: " .. toggleKey.Name .. " = pause script · " .. unloadKey.Name .. " = unload · " .. menuToggleKey.Name .. " = hide/show menu.",
+    "Keys: " .. menuToggleKey.Name .. " = open/close menu · " .. toggleKey.Name .. " = pause script · " .. unloadKey.Name .. " = unload.",
     6
 )
 
