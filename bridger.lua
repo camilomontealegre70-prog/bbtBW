@@ -1,6 +1,6 @@
 -- ================================================
 -- Bridger: WESTERN | Saint Corpse Collector
--- PUBLIX THEME Edition | Q = toggle | P = unload
+-- PUBLIX THEME Edition | Q = script pause · P = unload · RightShift = menu
 -- ================================================
 
 repeat task.wait(0.5) until game:IsLoaded()
@@ -39,8 +39,9 @@ local LOAD_WAIT         = 3
 local MAX_GROUND_DIST   = 15
 local CLOSE_HIT_DIST    = 8
 local MENU_BLUR_SIZE    = 10
-local toggleKey         = Enum.KeyCode.Q
+local toggleKey         = Enum.KeyCode.Q       -- pause / resume script logic
 local unloadKey         = Enum.KeyCode.P
+local menuToggleKey     = Enum.KeyCode.RightShift -- show / hide entire menu UI
 
 -- ============================================
 -- PUBLIX THEME (+ dark “script hub” shell like Cerberus-style UIs)
@@ -92,6 +93,7 @@ local THEME = {
     ShellText       = Color3.fromRGB(236, 237, 242),
     ShellMuted      = Color3.fromRGB(148, 152, 165),
     ShellToggleOff  = Color3.fromRGB(52, 55, 66),
+    TabText         = Color3.fromRGB(205, 208, 218),
 }
 
 local FAST  = TweenInfo.new(0.16, Enum.EasingStyle.Quad,  Enum.EasingDirection.Out)
@@ -110,6 +112,15 @@ local watchedParts     = {}
 local pendingPart      = nil
 local connections      = {}
 local char, hrp, hum
+
+-- Stands the script treats as “wanted” (editable in Stands tab)
+local selectedStands = {}
+for _, s in ipairs(WANTED_STANDS) do
+    selectedStands[s] = true
+end
+
+local menuGuiOpen      = true
+local menuGuiWasMinimized = false
 
 -- Forward declarations (must exist as upvalues before any closure references them)
 local runStartupScan
@@ -254,47 +265,18 @@ local function showSplash()
     card.BorderSizePixel = 0
     card.ZIndex = 101
     card.Parent = splash
-    corner(card, 20)
-    stroke(card, Color3.fromRGB(255, 255, 255), 1).Transparency = 0.5
+    corner(card, 24)
+    stroke(card, THEME.PublixGreen, 1).Transparency = 0.55
 
-    -- Logo (spins)
+    -- Logo (ring drawn first so it sits behind the image)
     local logoHolder = Instance.new("Frame")
     logoHolder.AnchorPoint = Vector2.new(0.5, 0.5)
-    logoHolder.Position = UDim2.new(0.5, 0, 0.5, -24)
+    logoHolder.Position = UDim2.new(0.5, 0, 0.5, -28)
     logoHolder.Size = UDim2.new(0, 120, 0, 120)
     logoHolder.BackgroundTransparency = 1
     logoHolder.ZIndex = 103
     logoHolder.Parent = card
 
-    local splashWord = Instance.new("TextLabel")
-    splashWord.AnchorPoint = Vector2.new(0.5, 0.5)
-    splashWord.Position = UDim2.new(0.5, 0, 0.5, 0)
-    splashWord.Size = UDim2.new(1, 0, 0, 36)
-    splashWord.BackgroundTransparency = 1
-    splashWord.Text = "PUBLIX"
-    splashWord.Font = Enum.Font.GothamBlack
-    splashWord.TextSize = 28
-    splashWord.TextColor3 = THEME.PublixGreen
-    splashWord.TextTransparency = 0.25
-    splashWord.ZIndex = 103
-    splashWord.Parent = logoHolder
-
-    local logo = Instance.new("ImageLabel")
-    logo.AnchorPoint = Vector2.new(0.5, 0.5)
-    logo.Position = UDim2.new(0.5, 0, 0.5, 0)
-    logo.Size = UDim2.new(1, 0, 1, 0)
-    logo.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    logo.BackgroundTransparency = 0.88
-    logo.BorderSizePixel = 0
-    applyPublixLogoImage(logo)
-    logo.ImageTransparency = 1
-    logo.ScaleType = Enum.ScaleType.Fit
-    logo.Rotation = 0
-    logo.ZIndex = 104
-    logo.Parent = logoHolder
-    corner(logo, 12)
-
-    -- Orbit ring behind logo
     local ring = Instance.new("Frame")
     ring.AnchorPoint = Vector2.new(0.5, 0.5)
     ring.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -303,8 +285,23 @@ local function showSplash()
     ring.ZIndex = 102
     ring.Parent = logoHolder
     local ringStroke = stroke(ring, THEME.PublixGreenLite, 2)
-    ringStroke.Transparency = 0.6
+    ringStroke.Transparency = 0.45
     corner(ring, 999)
+
+    local logo = Instance.new("ImageLabel")
+    logo.AnchorPoint = Vector2.new(0.5, 0.5)
+    logo.Position = UDim2.new(0.5, 0, 0.5, 0)
+    logo.Size = UDim2.new(1, 0, 1, 0)
+    logo.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    logo.BackgroundTransparency = 0.82
+    logo.BorderSizePixel = 0
+    applyPublixLogoImage(logo)
+    logo.ImageTransparency = 1
+    logo.ScaleType = Enum.ScaleType.Fit
+    logo.Rotation = 0
+    logo.ZIndex = 104
+    logo.Parent = logoHolder
+    corner(logo, 14)
 
     -- Title + subtitle
     local title = Instance.new("TextLabel")
@@ -328,7 +325,7 @@ local function showSplash()
     subtitle.Text = "Where Shopping is a Pleasure"
     subtitle.Font = Enum.Font.Gotham
     subtitle.TextSize = 12
-    subtitle.TextColor3 = THEME.TextMid
+    subtitle.TextColor3 = THEME.ShellMuted
     subtitle.TextTransparency = 1
     subtitle.ZIndex = 103
     subtitle.Parent = card
@@ -360,7 +357,7 @@ local function showSplash()
     loadingText.Text = "Loading 0%"
     loadingText.Font = Enum.Font.GothamMedium
     loadingText.TextSize = 11
-    loadingText.TextColor3 = THEME.TextMid
+    loadingText.TextColor3 = THEME.ShellMuted
     loadingText.TextTransparency = 1
     loadingText.ZIndex = 104
     loadingText.Parent = card
@@ -420,7 +417,7 @@ Window.BackgroundColor3 = THEME.ShellWindow
 Window.BorderSizePixel = 0
 Window.ClipsDescendants = true
 Window.Parent = ScreenGui
-corner(Window, 16)
+corner(Window, 20)
 
 -- Accent outline (script-hub style)
 local winStroke = stroke(Window, THEME.PublixGreen, 1)
@@ -450,7 +447,7 @@ Header.Size = UDim2.new(1, 0, 0, 64)
 Header.BackgroundColor3 = THEME.ShellHeader
 Header.BorderSizePixel = 0
 Header.Parent = Window
-corner(Header, 16)
+corner(Header, 20)
 
 -- Subtle depth on dark header
 local headerGrad = Instance.new("UIGradient")
@@ -470,44 +467,25 @@ HeaderAccent.BackgroundColor3 = THEME.PublixGreen
 HeaderAccent.BorderSizePixel = 0
 HeaderAccent.Parent = Header
 
--- Logo slot: image + always-visible wordmark (asset can still fail in some clients)
-local LogoSlot = Instance.new("Frame")
-LogoSlot.Name = "LogoSlot"
-LogoSlot.AnchorPoint = Vector2.new(0, 0.5)
-LogoSlot.Position = UDim2.new(0, 14, 0.5, 0)
-LogoSlot.Size = UDim2.new(0, 112, 0, 40)
-LogoSlot.BackgroundTransparency = 1
-LogoSlot.Parent = Header
-
-local HeaderWord = Instance.new("TextLabel")
-HeaderWord.Size = UDim2.new(0, 64, 1, 0)
-HeaderWord.Position = UDim2.new(0, 0, 0, 0)
-HeaderWord.BackgroundTransparency = 1
-HeaderWord.Text = "PUBLIX"
-HeaderWord.Font = Enum.Font.GothamBlack
-HeaderWord.TextSize = 13
-HeaderWord.TextColor3 = THEME.PublixGreen
-HeaderWord.TextXAlignment = Enum.TextXAlignment.Left
-HeaderWord.Parent = LogoSlot
-
+-- Logo only (wordmark is in title area — avoids overlapping “BRIDGER CONTROL”)
 local HeaderLogo = Instance.new("ImageLabel")
 HeaderLogo.Name = "Logo"
-HeaderLogo.AnchorPoint = Vector2.new(1, 0.5)
-HeaderLogo.Position = UDim2.new(1, 0, 0.5, 0)
-HeaderLogo.Size = UDim2.new(0, 40, 0, 40)
+HeaderLogo.AnchorPoint = Vector2.new(0, 0.5)
+HeaderLogo.Position = UDim2.new(0, 14, 0.5, 0)
+HeaderLogo.Size = UDim2.new(0, 44, 0, 44)
 HeaderLogo.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-HeaderLogo.BackgroundTransparency = 0.9
+HeaderLogo.BackgroundTransparency = 0.88
 HeaderLogo.BorderSizePixel = 0
 applyPublixLogoImage(HeaderLogo)
 HeaderLogo.ImageTransparency = 1
 HeaderLogo.ScaleType = Enum.ScaleType.Fit
-HeaderLogo.Parent = LogoSlot
-corner(HeaderLogo, 8)
+HeaderLogo.Parent = Header
+corner(HeaderLogo, 10)
 
 local HeaderTitle = Instance.new("TextLabel")
 HeaderTitle.AnchorPoint = Vector2.new(0, 0.5)
-HeaderTitle.Position = UDim2.new(0, 134, 0.5, -9)
-HeaderTitle.Size = UDim2.new(1, -260, 0, 20)
+HeaderTitle.Position = UDim2.new(0, 68, 0.5, -9)
+HeaderTitle.Size = UDim2.new(1, -268, 0, 20)
 HeaderTitle.BackgroundTransparency = 1
 HeaderTitle.Text = "BRIDGER CONTROL"
 HeaderTitle.Font = Enum.Font.GothamBold
@@ -518,8 +496,8 @@ HeaderTitle.Parent = Header
 
 local HeaderSub = Instance.new("TextLabel")
 HeaderSub.AnchorPoint = Vector2.new(0, 0.5)
-HeaderSub.Position = UDim2.new(0, 66, 0.5, 11)
-HeaderSub.Size = UDim2.new(1, -260, 0, 16)
+HeaderSub.Position = UDim2.new(0, 68, 0.5, 11)
+HeaderSub.Size = UDim2.new(1, -268, 0, 16)
 HeaderSub.BackgroundTransparency = 1
 HeaderSub.Text = "Publix Edition  |  Saint Corpse Collector"
 HeaderSub.Font = Enum.Font.Gotham
@@ -583,8 +561,10 @@ TabBar.Size = UDim2.new(0, 160, 1, -64)
 TabBar.BackgroundColor3 = THEME.ShellSidebar
 TabBar.BackgroundTransparency = 0
 TabBar.BorderSizePixel = 0
+TabBar.ZIndex = 3
+TabBar.ClipsDescendants = false
 TabBar.Parent = Window
-corner(TabBar, 16)
+corner(TabBar, 20)
 
 -- Right-edge divider
 local TabDivider = Instance.new("Frame")
@@ -607,8 +587,9 @@ ContentArea.Position = UDim2.new(0, 160, 0, 64)
 ContentArea.Size = UDim2.new(1, -160, 1, -64)
 ContentArea.BackgroundColor3 = THEME.ShellContent
 ContentArea.BorderSizePixel = 0
+ContentArea.ZIndex = 2
 ContentArea.Parent = Window
-corner(ContentArea, 16)
+corner(ContentArea, 20)
 
 local contentGrad = Instance.new("UIGradient")
 contentGrad.Rotation = 100
@@ -627,14 +608,14 @@ local function setActiveTab(tabData)
         t.Page.Visible = (t == tabData)
         local active = (t == tabData)
         tween(t.Button, FAST, {
-            BackgroundTransparency = active and 0 or 1,
-            BackgroundColor3 = active and THEME.ShellCard or THEME.ShellCard,
+            BackgroundTransparency = active and 0.28 or 0.9,
+            BackgroundColor3 = THEME.ShellCard,
         })
         tween(t.Label, FAST, {
-            TextColor3 = active and THEME.PublixGreenLite or THEME.ShellMuted
+            TextColor3 = active and THEME.PublixGreenLite or THEME.TabText
         })
         tween(t.Icon, FAST, {
-            TextColor3 = active and THEME.PublixGreenLite or THEME.ShellMuted
+            TextColor3 = active and THEME.PublixGreenLite or THEME.TabText
         })
         tween(t.Stroke, FAST, {
             Transparency = active and 0.25 or 1
@@ -658,9 +639,10 @@ local function createTab(name, iconText)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 38)
     btn.BackgroundColor3 = THEME.ShellCard
-    btn.BackgroundTransparency = 1
+    btn.BackgroundTransparency = 0.9
     btn.AutoButtonColor = false
     btn.Text = ""
+    btn.ZIndex = 4
     btn.Parent = TabBar
     corner(btn, 10)
     local btnStroke = stroke(btn, THEME.ShellLine, 1)
@@ -678,25 +660,27 @@ local function createTab(name, iconText)
     corner(indicator, 2)
 
     local icon = Instance.new("TextLabel")
-    icon.Size = UDim2.new(0, 20, 1, 0)
-    icon.Position = UDim2.new(0, 14, 0, 0)
+    icon.Size = UDim2.new(0, 22, 1, 0)
+    icon.Position = UDim2.new(0, 12, 0, 0)
     icon.BackgroundTransparency = 1
     icon.Text = iconText or "[ ]"
     icon.Font = Enum.Font.GothamBold
-    icon.TextSize = 11
-    icon.TextColor3 = THEME.ShellMuted
+    icon.TextSize = 12
+    icon.TextColor3 = THEME.TabText
     icon.TextXAlignment = Enum.TextXAlignment.Left
+    icon.ZIndex = 5
     icon.Parent = btn
 
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -40, 1, 0)
-    lbl.Position = UDim2.new(0, 32, 0, 0)
+    lbl.Size = UDim2.new(1, -38, 1, 0)
+    lbl.Position = UDim2.new(0, 34, 0, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = name
     lbl.Font = Enum.Font.GothamMedium
     lbl.TextSize = 13
-    lbl.TextColor3 = THEME.ShellMuted
+    lbl.TextColor3 = THEME.TabText
     lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 5
     lbl.Parent = btn
 
     local page = Instance.new("ScrollingFrame")
@@ -723,13 +707,13 @@ local function createTab(name, iconText)
     btn.MouseButton1Click:Connect(function() setActiveTab(tab) end)
     btn.MouseEnter:Connect(function()
         if activeTab ~= tab then
-            tween(btn, FAST, {BackgroundTransparency = 0.6})
+            tween(btn, FAST, {BackgroundTransparency = 0.72})
             tween(btnStroke, FAST, {Transparency = 0.35})
         end
     end)
     btn.MouseLeave:Connect(function()
         if activeTab ~= tab then
-            tween(btn, FAST, {BackgroundTransparency = 1})
+            tween(btn, FAST, {BackgroundTransparency = 0.9})
             tween(btnStroke, FAST, {Transparency = 1})
         end
     end)
@@ -740,6 +724,37 @@ end
 -- ============================================
 -- CONTROL BUILDERS (modern / sleek)
 -- ============================================
+local function addWrappedNote(tab, text)
+    local holder = Instance.new("Frame")
+    holder.Size = UDim2.new(1, 0, 0, 0)
+    holder.AutomaticSize = Enum.AutomaticSize.Y
+    holder.BackgroundColor3 = THEME.ShellCard
+    holder.BorderSizePixel = 0
+    holder.Parent = tab.Page
+    corner(holder, 10)
+    local holderStroke = stroke(holder, THEME.ShellLine, 1)
+    holderStroke.Transparency = 0.55
+    padding(holder, 10)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Position = UDim2.new(0, 0, 0, 0)
+    lbl.Size = UDim2.new(1, 0, 0, 0)
+    lbl.AutomaticSize = Enum.AutomaticSize.Y
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 12
+    lbl.TextColor3 = THEME.ShellText
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextYAlignment = Enum.TextYAlignment.Top
+    lbl.TextWrapped = true
+    lbl.Parent = holder
+
+    return {
+        Set = function(_, t) lbl.Text = t end,
+    }
+end
+
 local function addSection(tab, title)
     local holder = Instance.new("Frame")
     holder.Size = UDim2.new(1, 0, 0, 22)
@@ -932,6 +947,24 @@ local StatusElement = addLabel(MainTab, "Status: Waiting...")
 local StandElement  = addLabel(MainTab, "Last Stand: None")
 local RuntimeElement = addLabel(MainTab, "Run Time: 00:00:00")
 
+addSection(MainTab, "Selected stands")
+local SelectedStandsElement = addWrappedNote(MainTab, "")
+
+local function refreshSelectedStandsSummary()
+    local names = {}
+    for _, s in ipairs(WANTED_STANDS) do
+        if selectedStands[s] then
+            table.insert(names, s)
+        end
+    end
+    if #names == 0 then
+        SelectedStandsElement:Set("None selected. The script will not treat any roll as “wanted” until you enable at least one stand in the Stands tab.")
+    else
+        SelectedStandsElement:Set("Wanted when rolled:\n" .. table.concat(names, ", "))
+    end
+end
+refreshSelectedStandsSummary()
+
 addSection(MainTab, "Features")
 local collectorToggleCtl
 collectorToggleCtl = addToggle(MainTab, "Auto Collector", collectorEnabled, function(s)
@@ -959,21 +992,36 @@ end)
 
 addButton(MainTab, "Unload Script", function() unloadScript() end)
 
-addSection(StandTab, "Wanted Stands")
+addSection(StandTab, "Stand filter")
+addWrappedNote(StandTab, "Turn stands ON to count as wanted when you roll. OFF = unwanted (auto-wipe can still apply).")
+
+addSection(StandTab, "Select stands")
 for _, stand in ipairs(WANTED_STANDS) do
-    addLabel(StandTab, "✓ " .. stand)
+    addToggle(StandTab, stand, selectedStands[stand], function(on)
+        selectedStands[stand] = on
+        refreshSelectedStandsSummary()
+    end)
 end
 
-addSection(KeybindTab, "Controls")
-local ToggleKeyElement = addLabel(KeybindTab, "Toggle Menu Key: " .. toggleKey.Name)
-local UnloadKeyElement = addLabel(KeybindTab, "Unload Script Key: " .. unloadKey.Name)
+addSection(KeybindTab, "What is bound")
+local KeybindReadout = addWrappedNote(KeybindTab, "")
+
+local function refreshKeybindReadout()
+    KeybindReadout:Set(table.concat({
+        "• Script pause / resume  →  " .. toggleKey.Name,
+        "• Unload script          →  " .. unloadKey.Name,
+        "• Show / hide menu UI    →  " .. menuToggleKey.Name,
+    }, "\n"))
+end
+
+addSection(KeybindTab, "Rebind")
 local keybindCaptureActive = false
 
 local function bindKey(kind)
     if keybindCaptureActive then return end
     keybindCaptureActive = true
 
-    notify("Keybind Capture", "Press any key to set " .. kind .. " keybind.", 3)
+    notify("Keybind capture", "Press a keyboard key for: " .. kind, 3)
     local conn
     conn = UIS.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
@@ -983,29 +1031,36 @@ local function bindKey(kind)
         conn:Disconnect()
         keybindCaptureActive = false
 
-        if kind == "Toggle" then
+        if kind == "ScriptToggle" then
             toggleKey = chosen
-            ToggleKeyElement:Set("Toggle Menu Key: " .. toggleKey.Name)
-            notify("Keybind Updated", "Toggle key is now " .. toggleKey.Name, 3)
-        else
+            notify("Keybind updated", "Script pause key: " .. toggleKey.Name, 3)
+        elseif kind == "Unload" then
             unloadKey = chosen
-            UnloadKeyElement:Set("Unload Script Key: " .. unloadKey.Name)
-            notify("Keybind Updated", "Unload key is now " .. unloadKey.Name, 3)
+            notify("Keybind updated", "Unload key: " .. unloadKey.Name, 3)
+        elseif kind == "MenuToggle" then
+            menuToggleKey = chosen
+            notify("Keybind updated", "Menu show/hide key: " .. menuToggleKey.Name, 3)
         end
+        refreshKeybindReadout()
     end)
 end
 
-addButton(KeybindTab, "Set Toggle Key", function()
-    bindKey("Toggle")
+addButton(KeybindTab, "Set script pause key", function()
+    bindKey("ScriptToggle")
 end)
-addButton(KeybindTab, "Set Unload Key", function()
+addButton(KeybindTab, "Set unload key", function()
     bindKey("Unload")
 end)
+addButton(KeybindTab, "Set menu show / hide key", function()
+    bindKey("MenuToggle")
+end)
+
+refreshKeybindReadout()
 
 addSection(InfoTab, "About")
 addLabel(InfoTab, "Bridger · Publix Edition")
 addLabel(InfoTab, "Theme: Publix Green")
-addLabel(InfoTab, "Hotkeys can be changed in Keybinds tab")
+addLabel(InfoTab, "Use the Keybinds tab to see and change hotkeys.")
 addLabel(InfoTab, "Where Shopping is a Pleasure")
 
 -- Start on Main tab
@@ -1156,7 +1211,7 @@ local function setMenuBackdropExpanded(expanded)
         tween(menuBlur, FAST, {Size = 0})
         tween(Backdrop, FAST, {BackgroundTransparency = 1})
         task.delay(0.35, function()
-            if Backdrop.Parent and minimized then
+            if Backdrop.Parent then
                 Backdrop.Visible = false
             end
         end)
@@ -1165,11 +1220,14 @@ end
 
 task.spawn(function()
     task.wait(2.0) -- wait for splash
-    tween(Window, BOUNCE, {Size = TARGET_WIN_SIZE})
-    tween(HeaderLogo, SMOOTH, {ImageTransparency = 0})
+    if menuGuiOpen then
+        tween(Window, BOUNCE, {Size = TARGET_WIN_SIZE})
+        tween(HeaderLogo, SMOOTH, {ImageTransparency = 0})
+    end
 end)
 
 local function minimizeWindow()
+    if not menuGuiOpen then return end
     minimized = not minimized
     if minimized then
         setMenuBackdropExpanded(false)
@@ -1180,14 +1238,32 @@ local function minimizeWindow()
     end
 end
 
+local function syncMenuGuiVisibility()
+    Window.Visible = menuGuiOpen
+    if not menuGuiOpen then
+        menuGuiWasMinimized = minimized
+        setMenuBackdropExpanded(false)
+        return
+    end
+    minimized = menuGuiWasMinimized
+    if minimized then
+        tween(Window, FAST, {Size = UDim2.new(0, 620, 0, 64)})
+        setMenuBackdropExpanded(false)
+    else
+        tween(Window, GLIDE, {Size = TARGET_WIN_SIZE})
+        setMenuBackdropExpanded(true)
+    end
+end
+
 local function closeWindow()
     tween(Window, SMOOTH, {Size = UDim2.new(0, 0, 0, 0)})
 end
 
 local function openWindow()
     minimized = false
-    setMenuBackdropExpanded(true)
-    tween(Window, BOUNCE, {Size = TARGET_WIN_SIZE})
+    menuGuiWasMinimized = false
+    menuGuiOpen = true
+    syncMenuGuiVisibility()
 end
 
 MinBtn.MouseButton1Click:Connect(minimizeWindow)
@@ -1262,6 +1338,13 @@ end
 
 table.insert(connections, UIS.InputBegan:Connect(function(i, gp)
     if gp then return end
+    if i.UserInputType ~= Enum.UserInputType.Keyboard then return end
+    if i.KeyCode == menuToggleKey then
+        menuGuiOpen = not menuGuiOpen
+        syncMenuGuiVisibility()
+        return
+    end
+    if not menuGuiOpen then return end
     if i.KeyCode == toggleKey then toggleScript() end
     if i.KeyCode == unloadKey then unloadScript() end
 end))
@@ -1372,10 +1455,7 @@ end
 -- STAND DETECTION
 -- ============================================
 local function isWanted(name)
-    for _, s in ipairs(WANTED_STANDS) do
-        if s == name then return true end
-    end
-    return false
+    return selectedStands[name] == true
 end
 
 local function clickWipe()
@@ -1644,7 +1724,11 @@ end)
 -- ============================================
 setStatus("Waiting for Play click...")
 print("[Script] Loaded! Q = toggle | P = unload")
-notify("Publix Edition", "Script loaded. Press " .. toggleKey.Name .. " to pause, " .. unloadKey.Name .. " to unload.", 5)
+notify(
+    "Publix Edition",
+    "Keys: " .. toggleKey.Name .. " = pause script · " .. unloadKey.Name .. " = unload · " .. menuToggleKey.Name .. " = hide/show menu.",
+    6
+)
 
 local _ = player.Character or player.CharacterAdded:Wait()
 task.wait(LOAD_WAIT)
