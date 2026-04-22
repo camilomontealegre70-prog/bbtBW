@@ -150,6 +150,9 @@ local function stroke(parent, color, thickness)
     s.Color = color or THEME.PublixGreen
     s.Thickness = thickness or 1
     s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    pcall(function()
+        s.LineJoinMode = Enum.LineJoinMode.Round
+    end)
     s.Parent = parent
     return s
 end
@@ -254,19 +257,27 @@ local function showSplash()
     splash.Parent = ScreenGui
     tween(splash, GLIDE, {BackgroundTransparency = 0.35})
 
-    -- Glass card
+    -- Dark glass card (no white panel)
     local card = Instance.new("Frame")
     card.Name = "Card"
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.new(0.5, 0, 0.5, 0)
     card.Size = UDim2.new(0, 0, 0, 0)
-    card.BackgroundColor3 = THEME.CardBG
-    card.BackgroundTransparency = 0.05
+    card.BackgroundColor3 = Color3.fromRGB(12, 13, 18)
+    card.BackgroundTransparency = 0.12
     card.BorderSizePixel = 0
     card.ZIndex = 101
     card.Parent = splash
     corner(card, 24)
-    stroke(card, THEME.PublixGreen, 1).Transparency = 0.55
+    local cardStroke = stroke(card, THEME.PublixGreen, 1.25)
+    cardStroke.Transparency = 0.35
+    local cardGrad = Instance.new("UIGradient")
+    cardGrad.Rotation = 120
+    cardGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 32, 40)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 11, 14)),
+    })
+    cardGrad.Parent = card
 
     -- Logo (ring drawn first so it sits behind the image)
     local logoHolder = Instance.new("Frame")
@@ -292,8 +303,8 @@ local function showSplash()
     logo.AnchorPoint = Vector2.new(0.5, 0.5)
     logo.Position = UDim2.new(0.5, 0, 0.5, 0)
     logo.Size = UDim2.new(1, 0, 1, 0)
-    logo.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    logo.BackgroundTransparency = 0.82
+    logo.BackgroundColor3 = Color3.fromRGB(22, 24, 30)
+    logo.BackgroundTransparency = 0.35
     logo.BorderSizePixel = 0
     applyPublixLogoImage(logo)
     logo.ImageTransparency = 1
@@ -302,6 +313,10 @@ local function showSplash()
     logo.ZIndex = 104
     logo.Parent = logoHolder
     corner(logo, 14)
+
+    local logoScale = Instance.new("UIScale")
+    logoScale.Scale = 0.08
+    logoScale.Parent = logoHolder
 
     -- Title + subtitle
     local title = Instance.new("TextLabel")
@@ -312,7 +327,7 @@ local function showSplash()
     title.Text = "PUBLIX"
     title.Font = Enum.Font.GothamBlack
     title.TextSize = 22
-    title.TextColor3 = THEME.PublixGreen
+    title.TextColor3 = THEME.PublixGreenLite
     title.TextTransparency = 1
     title.ZIndex = 103
     title.Parent = card
@@ -325,7 +340,7 @@ local function showSplash()
     subtitle.Text = "Where Shopping is a Pleasure"
     subtitle.Font = Enum.Font.Gotham
     subtitle.TextSize = 12
-    subtitle.TextColor3 = THEME.ShellMuted
+    subtitle.TextColor3 = Color3.fromRGB(168, 176, 190)
     subtitle.TextTransparency = 1
     subtitle.ZIndex = 103
     subtitle.Parent = card
@@ -335,7 +350,7 @@ local function showSplash()
     barBG.AnchorPoint = Vector2.new(0.5, 1)
     barBG.Position = UDim2.new(0.5, 0, 1, -22)
     barBG.Size = UDim2.new(1, -48, 0, 4)
-    barBG.BackgroundColor3 = THEME.LightBG2
+    barBG.BackgroundColor3 = Color3.fromRGB(40, 44, 54)
     barBG.BorderSizePixel = 0
     barBG.ZIndex = 103
     barBG.Parent = card
@@ -370,12 +385,13 @@ local function showSplash()
     })
     barGrad.Parent = barFG
 
-    -- Animate in
+    -- Animate in (logo pops in on UIScale + fade)
     tween(card, BOUNCE, {Size = UDim2.new(0, 340, 0, 280)})
-    task.wait(0.2)
-    logo.Size = UDim2.new(0.55, 0, 0.55, 0)
-    tween(logo,     SMOOTH, {ImageTransparency = 0})
-    tween(logo,     BOUNCE, {Size = UDim2.new(1, 0, 1, 0)})
+    task.wait(0.12)
+    logo.Size = UDim2.new(0.45, 0, 0.45, 0)
+    tween(logoScale, TweenInfo.new(0.65, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
+    tween(logo, SMOOTH, {ImageTransparency = 0, BackgroundTransparency = 0.92})
+    tween(logo, BOUNCE, {Size = UDim2.new(1, 0, 1, 0)})
     tween(title,    SMOOTH, {TextTransparency = 0})
     tween(subtitle, SMOOTH, {TextTransparency = 0})
     tween(loadingText, SMOOTH, {TextTransparency = 0})
@@ -393,6 +409,7 @@ local function showSplash()
     -- Animate out
     tween(splash, SMOOTH, {BackgroundTransparency = 1})
     tween(card,   SMOOTH, {Size = UDim2.new(0, 0, 0, 0)})
+    tween(logoScale, FAST, {Scale = 0.06})
     tween(logo,   FAST,   {ImageTransparency = 1})
     tween(title,  FAST,   {TextTransparency = 1})
     tween(subtitle, FAST, {TextTransparency = 1})
@@ -415,13 +432,13 @@ Window.Position = UDim2.new(0.5, 0, 0.5, 0)
 Window.Size = UDim2.new(0, 0, 0, 0) -- animated in
 Window.BackgroundColor3 = THEME.ShellWindow
 Window.BorderSizePixel = 0
-Window.ClipsDescendants = true
+Window.ClipsDescendants = false
 Window.Parent = ScreenGui
-corner(Window, 20)
+corner(Window, 22)
 
--- Accent outline (script-hub style)
-local winStroke = stroke(Window, THEME.PublixGreen, 1)
-winStroke.Transparency = 0.65
+-- Accent outline (rounded joins read smoother when the window is not clipping strokes)
+local winStroke = stroke(Window, THEME.PublixGreen, 1.25)
+winStroke.Transparency = 0.5
 
 -- Soft drop shadow (outside the window)
 local shadow = Instance.new("ImageLabel")
@@ -447,7 +464,7 @@ Header.Size = UDim2.new(1, 0, 0, 64)
 Header.BackgroundColor3 = THEME.ShellHeader
 Header.BorderSizePixel = 0
 Header.Parent = Window
-corner(Header, 20)
+corner(Header, 22)
 
 -- Subtle depth on dark header
 local headerGrad = Instance.new("UIGradient")
@@ -557,14 +574,14 @@ end
 local TabBar = Instance.new("Frame")
 TabBar.Name = "TabBar"
 TabBar.Position = UDim2.new(0, 0, 0, 64)
-TabBar.Size = UDim2.new(0, 160, 1, -64)
+TabBar.Size = UDim2.new(0, 182, 1, -64)
 TabBar.BackgroundColor3 = THEME.ShellSidebar
 TabBar.BackgroundTransparency = 0
 TabBar.BorderSizePixel = 0
 TabBar.ZIndex = 3
 TabBar.ClipsDescendants = false
 TabBar.Parent = Window
-corner(TabBar, 20)
+-- No UICorner on sidebar: corner clipping was hiding bottom tabs (e.g. Keybinds) on some clients
 
 -- Right-edge divider
 local TabDivider = Instance.new("Frame")
@@ -575,21 +592,25 @@ TabDivider.BackgroundColor3 = THEME.ShellLine
 TabDivider.BorderSizePixel = 0
 TabDivider.Parent = TabBar
 
+padding(TabBar, 10)
 local TabList = Instance.new("UIListLayout")
-TabList.Padding = UDim.new(0, 4)
+TabList.Padding = UDim.new(0, 6)
 TabList.SortOrder = Enum.SortOrder.LayoutOrder
+TabList.FillDirection = Enum.FillDirection.Vertical
+TabList.HorizontalAlignment = Enum.HorizontalAlignment.Left
+TabList.VerticalAlignment = Enum.VerticalAlignment.Top
+TabList.LayoutOrder = -1000
 TabList.Parent = TabBar
-padding(TabBar, 12)
 
 local ContentArea = Instance.new("Frame")
 ContentArea.Name = "Content"
-ContentArea.Position = UDim2.new(0, 160, 0, 64)
-ContentArea.Size = UDim2.new(1, -160, 1, -64)
+ContentArea.Position = UDim2.new(0, 182, 0, 64)
+ContentArea.Size = UDim2.new(1, -182, 1, -64)
 ContentArea.BackgroundColor3 = THEME.ShellContent
 ContentArea.BorderSizePixel = 0
 ContentArea.ZIndex = 2
 ContentArea.Parent = Window
-corner(ContentArea, 20)
+corner(ContentArea, 14)
 
 local contentGrad = Instance.new("UIGradient")
 contentGrad.Rotation = 100
@@ -636,8 +657,10 @@ local function setActiveTab(tabData)
 end
 
 local function createTab(name, iconText)
+    local tabIndex = #tabs + 1
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 38)
+    btn.Size = UDim2.new(1, -4, 0, 40)
+    btn.LayoutOrder = tabIndex
     btn.BackgroundColor3 = THEME.ShellCard
     btn.BackgroundTransparency = 0.9
     btn.AutoButtonColor = false
@@ -676,7 +699,7 @@ local function createTab(name, iconText)
     lbl.Position = UDim2.new(0, 34, 0, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = name
-    lbl.Font = Enum.Font.GothamMedium
+    lbl.Font = Enum.Font.GothamBold
     lbl.TextSize = 13
     lbl.TextColor3 = THEME.TabText
     lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -687,6 +710,8 @@ local function createTab(name, iconText)
     page.Size = UDim2.new(1, 0, 1, 0)
     page.BackgroundTransparency = 1
     page.BorderSizePixel = 0
+    page.ZIndex = 2
+    page.ClipsDescendants = true
     page.ScrollBarThickness = 3
     page.ScrollBarImageColor3 = THEME.PublixGreen
     page.ScrollBarImageTransparency = 0.3
