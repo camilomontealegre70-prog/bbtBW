@@ -432,7 +432,7 @@ Window.Position = UDim2.new(0.5, 0, 0.5, 0)
 Window.Size = UDim2.new(0, 0, 0, 0) -- animated in
 Window.BackgroundColor3 = THEME.ShellWindow
 Window.BorderSizePixel = 0
-Window.ClipsDescendants = false
+Window.ClipsDescendants = true
 Window.Parent = ScreenGui
 corner(Window, 22)
 
@@ -463,6 +463,7 @@ Header.Name = "Header"
 Header.Size = UDim2.new(1, 0, 0, 64)
 Header.BackgroundColor3 = THEME.ShellHeader
 Header.BorderSizePixel = 0
+Header.ZIndex = 10
 Header.Parent = Window
 corner(Header, 22)
 
@@ -473,6 +474,7 @@ headerGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, THEME.ShellHeader),
 })
 headerGrad.Rotation = 90
+headerGrad.ZIndex = 1
 headerGrad.Parent = Header
 
 -- Publix accent strip (Cerberus-style top bar accent)
@@ -482,6 +484,7 @@ HeaderAccent.Position = UDim2.new(0, 0, 1, -2)
 HeaderAccent.Size = UDim2.new(1, 0, 0, 2)
 HeaderAccent.BackgroundColor3 = THEME.PublixGreen
 HeaderAccent.BorderSizePixel = 0
+HeaderAccent.ZIndex = 11
 HeaderAccent.Parent = Header
 
 -- Logo only (wordmark is in title area — avoids overlapping “BRIDGER CONTROL”)
@@ -496,6 +499,7 @@ HeaderLogo.BorderSizePixel = 0
 applyPublixLogoImage(HeaderLogo)
 HeaderLogo.ImageTransparency = 1
 HeaderLogo.ScaleType = Enum.ScaleType.Fit
+HeaderLogo.ZIndex = 11
 HeaderLogo.Parent = Header
 corner(HeaderLogo, 10)
 
@@ -509,6 +513,7 @@ HeaderTitle.Font = Enum.Font.GothamBold
 HeaderTitle.TextSize = 15
 HeaderTitle.TextColor3 = THEME.ShellText
 HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
+HeaderTitle.ZIndex = 11
 HeaderTitle.Parent = Header
 
 local HeaderSub = Instance.new("TextLabel")
@@ -522,6 +527,7 @@ HeaderSub.TextSize = 11
 HeaderSub.TextColor3 = THEME.ShellMuted
 HeaderSub.TextXAlignment = Enum.TextXAlignment.Left
 HeaderSub.TextTransparency = 0.05
+HeaderSub.ZIndex = 11
 HeaderSub.Parent = Header
 
 local HeaderBadge = Instance.new("TextLabel")
@@ -534,6 +540,7 @@ HeaderBadge.Text = "PUBLIX STYLE"
 HeaderBadge.Font = Enum.Font.GothamBold
 HeaderBadge.TextSize = 10
 HeaderBadge.TextColor3 = THEME.PublixGreenLite
+HeaderBadge.ZIndex = 12
 HeaderBadge.Parent = Header
 corner(HeaderBadge, 999)
 local badgeStroke = stroke(HeaderBadge, THEME.PublixGreen, 1)
@@ -552,6 +559,7 @@ local function makeControlBtn(text, xOffset)
     b.TextSize = 16
     b.TextColor3 = THEME.ShellText
     b.AutoButtonColor = false
+    b.ZIndex = 12
     b.Parent = Header
     corner(b, 999)
     return b
@@ -578,7 +586,7 @@ TabBar.Size = UDim2.new(0, 182, 1, -64)
 TabBar.BackgroundColor3 = THEME.ShellSidebar
 TabBar.BackgroundTransparency = 0
 TabBar.BorderSizePixel = 0
-TabBar.ZIndex = 3
+TabBar.ZIndex = 2
 TabBar.ClipsDescendants = false
 TabBar.Parent = Window
 -- No UICorner on sidebar: corner clipping was hiding bottom tabs (e.g. Keybinds) on some clients
@@ -599,7 +607,6 @@ TabList.SortOrder = Enum.SortOrder.LayoutOrder
 TabList.FillDirection = Enum.FillDirection.Vertical
 TabList.HorizontalAlignment = Enum.HorizontalAlignment.Left
 TabList.VerticalAlignment = Enum.VerticalAlignment.Top
-TabList.LayoutOrder = -1000
 TabList.Parent = TabBar
 
 local ContentArea = Instance.new("Frame")
@@ -608,7 +615,7 @@ ContentArea.Position = UDim2.new(0, 182, 0, 64)
 ContentArea.Size = UDim2.new(1, -182, 1, -64)
 ContentArea.BackgroundColor3 = THEME.ShellContent
 ContentArea.BorderSizePixel = 0
-ContentArea.ZIndex = 2
+ContentArea.ZIndex = 1
 ContentArea.Parent = Window
 corner(ContentArea, 14)
 
@@ -710,13 +717,13 @@ local function createTab(name, iconText)
     page.Size = UDim2.new(1, 0, 1, 0)
     page.BackgroundTransparency = 1
     page.BorderSizePixel = 0
-    page.ZIndex = 2
+    page.ZIndex = 1
     page.ClipsDescendants = true
     page.ScrollBarThickness = 3
     page.ScrollBarImageColor3 = THEME.PublixGreen
     page.ScrollBarImageTransparency = 0.3
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
-    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    page.AutomaticCanvasSize = Enum.AutomaticSize.None
     page.Visible = false
     page.Parent = ContentArea
     padding(page, 18)
@@ -725,6 +732,13 @@ local function createTab(name, iconText)
     list.Padding = UDim.new(0, 10)
     list.SortOrder = Enum.SortOrder.LayoutOrder
     list.Parent = page
+
+    local function updatePageCanvas()
+        local h = list.AbsoluteContentSize.Y
+        page.CanvasSize = UDim2.new(0, 0, 0, math.max(math.ceil(h) + 32, 64))
+    end
+    list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updatePageCanvas)
+    task.defer(updatePageCanvas)
 
     local tab = { Button = btn, Label = lbl, Icon = icon, Page = page, Indicator = indicator, Stroke = btnStroke }
     table.insert(tabs, tab)
@@ -744,6 +758,16 @@ local function createTab(name, iconText)
     end)
 
     return tab
+end
+
+local function refreshAllTabCanvases()
+    for _, t in ipairs(tabs) do
+        local listLayout = t.Page:FindFirstChildOfClass("UIListLayout")
+        if listLayout then
+            local h = listLayout.AbsoluteContentSize.Y
+            t.Page.CanvasSize = UDim2.new(0, 0, 0, math.max(math.ceil(h) + 32, 64))
+        end
+    end
 end
 
 -- ============================================
@@ -1090,6 +1114,7 @@ addLabel(InfoTab, "Where Shopping is a Pleasure")
 
 -- Start on Main tab
 setActiveTab(MainTab)
+task.defer(refreshAllTabCanvases)
 
 -- ============================================
 -- NOTIFICATIONS
@@ -1248,6 +1273,7 @@ task.spawn(function()
     if menuGuiOpen then
         tween(Window, BOUNCE, {Size = TARGET_WIN_SIZE})
         tween(HeaderLogo, SMOOTH, {ImageTransparency = 0})
+        task.defer(refreshAllTabCanvases)
     end
 end)
 
@@ -1255,11 +1281,16 @@ local function minimizeWindow()
     if not menuGuiOpen then return end
     minimized = not minimized
     if minimized then
+        TabBar.Visible = false
+        ContentArea.Visible = false
         setMenuBackdropExpanded(false)
         tween(Window, SMOOTH, {Size = UDim2.new(0, 620, 0, 64)})
     else
+        TabBar.Visible = true
+        ContentArea.Visible = true
         setMenuBackdropExpanded(true)
         tween(Window, SMOOTH, {Size = TARGET_WIN_SIZE})
+        task.defer(refreshAllTabCanvases)
     end
 end
 
@@ -1272,11 +1303,16 @@ local function syncMenuGuiVisibility()
     end
     minimized = menuGuiWasMinimized
     if minimized then
+        TabBar.Visible = false
+        ContentArea.Visible = false
         tween(Window, FAST, {Size = UDim2.new(0, 620, 0, 64)})
         setMenuBackdropExpanded(false)
     else
+        TabBar.Visible = true
+        ContentArea.Visible = true
         tween(Window, GLIDE, {Size = TARGET_WIN_SIZE})
         setMenuBackdropExpanded(true)
+        task.defer(refreshAllTabCanvases)
     end
 end
 
