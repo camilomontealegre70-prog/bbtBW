@@ -37,6 +37,7 @@ local FALLBACK_INTERVAL = 5
 local LOAD_WAIT         = 3
 local MAX_GROUND_DIST   = 15
 local CLOSE_HIT_DIST    = 8
+local MENU_BLUR_SIZE    = 10
 local TOGGLE_KEY        = Enum.KeyCode.Q
 local UNLOAD_KEY        = Enum.KeyCode.P
 
@@ -136,6 +137,57 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = playerGui
+
+-- ============================================
+-- MENU BACKDROP (blur + ambient gradient)
+-- ============================================
+local menuBlur = Lighting:FindFirstChild("BridgerMenuBlur") or Instance.new("BlurEffect")
+menuBlur.Name = "BridgerMenuBlur"
+menuBlur.Size = 0
+menuBlur.Parent = Lighting
+tween(menuBlur, GLIDE, {Size = MENU_BLUR_SIZE})
+
+local Backdrop = Instance.new("Frame")
+Backdrop.Name = "Backdrop"
+Backdrop.Size = UDim2.new(1, 0, 1, 0)
+Backdrop.BackgroundColor3 = Color3.fromRGB(8, 20, 12)
+Backdrop.BackgroundTransparency = 0.3
+Backdrop.BorderSizePixel = 0
+Backdrop.ZIndex = -5
+Backdrop.Parent = ScreenGui
+
+local backdropGrad = Instance.new("UIGradient")
+backdropGrad.Rotation = 115
+backdropGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(10, 36, 18)),
+    ColorSequenceKeypoint.new(0.45, Color3.fromRGB(8, 20, 12)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(4, 12, 7)),
+})
+backdropGrad.Transparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 0.15),
+    NumberSequenceKeypoint.new(1, 0.35),
+})
+backdropGrad.Parent = Backdrop
+
+local ambientOrbA = Instance.new("Frame")
+ambientOrbA.Size = UDim2.new(0, 420, 0, 420)
+ambientOrbA.Position = UDim2.new(0, -120, 0, -140)
+ambientOrbA.BackgroundColor3 = THEME.PublixGreenLite
+ambientOrbA.BackgroundTransparency = 0.86
+ambientOrbA.BorderSizePixel = 0
+ambientOrbA.ZIndex = -4
+ambientOrbA.Parent = Backdrop
+corner(ambientOrbA, 999)
+
+local ambientOrbB = Instance.new("Frame")
+ambientOrbB.Size = UDim2.new(0, 380, 0, 380)
+ambientOrbB.Position = UDim2.new(1, -260, 1, -260)
+ambientOrbB.BackgroundColor3 = THEME.PublixGreen
+ambientOrbB.BackgroundTransparency = 0.9
+ambientOrbB.BorderSizePixel = 0
+ambientOrbB.ZIndex = -4
+ambientOrbB.Parent = Backdrop
+corner(ambientOrbB, 999)
 
 -- ============================================
 -- LOADING SPLASH (blur bg + spinning logo)
@@ -974,6 +1026,7 @@ unloadScript = function()
         tween(Window, SMOOTH, {Size = UDim2.new(0, 0, 0, 0)})
     end)
     task.wait(0.4)
+    pcall(function() menuBlur:Destroy() end)
     pcall(function() ScreenGui:Destroy() end)
     print("[Script] Unloaded!")
 end
@@ -1383,3 +1436,4 @@ local _ = player.Character or player.CharacterAdded:Wait()
 task.wait(LOAD_WAIT)
 runStartupScan()
 print("[Script] Active!")
+
