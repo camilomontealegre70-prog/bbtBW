@@ -1,6 +1,6 @@
 -- ================================================
 -- Bridger: WESTERN | Saint Corpse Collector
--- PUBLIX THEME Edition | Q = script pause · P = unload · Insert = menu
+-- PUBLIX THEME Edition | Q = script pause · P = unload · RightShift = menu
 -- ================================================
 
 repeat task.wait(0.5) until game:IsLoaded()
@@ -41,7 +41,7 @@ local CLOSE_HIT_DIST    = 8
 local MENU_BLUR_SIZE    = 10
 local toggleKey         = Enum.KeyCode.Q       -- pause / resume script logic
 local unloadKey         = Enum.KeyCode.P
-local menuToggleKey     = Enum.KeyCode.Insert -- show / hide entire menu UI (RightShift conflicts with many games)
+local menuToggleKey     = Enum.KeyCode.RightShift -- show / hide entire menu UI
 
 -- ============================================
 -- PUBLIX THEME (+ dark “script hub” shell like Cerberus-style UIs)
@@ -121,11 +121,6 @@ end
 
 local menuGuiOpen      = true
 local menuGuiWasMinimized = false
-local lastMenuToggleT  = 0
-
--- Window size (declared before building UI so the frame is never stuck at 0×0 if a later line errors)
-local TARGET_WIN_SIZE = UDim2.new(0, 620, 0, 400)
-local minimized       = false
 
 -- Forward declarations (must exist as upvalues before any closure references them)
 local runStartupScan
@@ -155,9 +150,6 @@ local function stroke(parent, color, thickness)
     s.Color = color or THEME.PublixGreen
     s.Thickness = thickness or 1
     s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    pcall(function()
-        s.LineJoinMode = Enum.LineJoinMode.Round
-    end)
     s.Parent = parent
     return s
 end
@@ -262,27 +254,19 @@ local function showSplash()
     splash.Parent = ScreenGui
     tween(splash, GLIDE, {BackgroundTransparency = 0.35})
 
-    -- Dark glass card (no white panel)
+    -- Glass card
     local card = Instance.new("Frame")
     card.Name = "Card"
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.new(0.5, 0, 0.5, 0)
     card.Size = UDim2.new(0, 0, 0, 0)
-    card.BackgroundColor3 = Color3.fromRGB(12, 13, 18)
-    card.BackgroundTransparency = 0.12
+    card.BackgroundColor3 = THEME.CardBG
+    card.BackgroundTransparency = 0.05
     card.BorderSizePixel = 0
     card.ZIndex = 101
     card.Parent = splash
     corner(card, 24)
-    local cardStroke = stroke(card, THEME.PublixGreen, 1.25)
-    cardStroke.Transparency = 0.35
-    local cardGrad = Instance.new("UIGradient")
-    cardGrad.Rotation = 120
-    cardGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 32, 40)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 11, 14)),
-    })
-    cardGrad.Parent = card
+    stroke(card, THEME.PublixGreen, 1).Transparency = 0.55
 
     -- Logo (ring drawn first so it sits behind the image)
     local logoHolder = Instance.new("Frame")
@@ -308,8 +292,8 @@ local function showSplash()
     logo.AnchorPoint = Vector2.new(0.5, 0.5)
     logo.Position = UDim2.new(0.5, 0, 0.5, 0)
     logo.Size = UDim2.new(1, 0, 1, 0)
-    logo.BackgroundColor3 = Color3.fromRGB(22, 24, 30)
-    logo.BackgroundTransparency = 0.35
+    logo.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    logo.BackgroundTransparency = 0.82
     logo.BorderSizePixel = 0
     applyPublixLogoImage(logo)
     logo.ImageTransparency = 1
@@ -318,10 +302,6 @@ local function showSplash()
     logo.ZIndex = 104
     logo.Parent = logoHolder
     corner(logo, 14)
-
-    local logoScale = Instance.new("UIScale")
-    logoScale.Scale = 0.08
-    logoScale.Parent = logoHolder
 
     -- Title + subtitle
     local title = Instance.new("TextLabel")
@@ -332,7 +312,7 @@ local function showSplash()
     title.Text = "PUBLIX"
     title.Font = Enum.Font.GothamBlack
     title.TextSize = 22
-    title.TextColor3 = THEME.PublixGreenLite
+    title.TextColor3 = THEME.PublixGreen
     title.TextTransparency = 1
     title.ZIndex = 103
     title.Parent = card
@@ -345,7 +325,7 @@ local function showSplash()
     subtitle.Text = "Where Shopping is a Pleasure"
     subtitle.Font = Enum.Font.Gotham
     subtitle.TextSize = 12
-    subtitle.TextColor3 = Color3.fromRGB(168, 176, 190)
+    subtitle.TextColor3 = THEME.ShellMuted
     subtitle.TextTransparency = 1
     subtitle.ZIndex = 103
     subtitle.Parent = card
@@ -355,7 +335,7 @@ local function showSplash()
     barBG.AnchorPoint = Vector2.new(0.5, 1)
     barBG.Position = UDim2.new(0.5, 0, 1, -22)
     barBG.Size = UDim2.new(1, -48, 0, 4)
-    barBG.BackgroundColor3 = Color3.fromRGB(40, 44, 54)
+    barBG.BackgroundColor3 = THEME.LightBG2
     barBG.BorderSizePixel = 0
     barBG.ZIndex = 103
     barBG.Parent = card
@@ -390,13 +370,12 @@ local function showSplash()
     })
     barGrad.Parent = barFG
 
-    -- Animate in (logo pops in on UIScale + fade)
+    -- Animate in
     tween(card, BOUNCE, {Size = UDim2.new(0, 340, 0, 280)})
-    task.wait(0.12)
-    logo.Size = UDim2.new(0.45, 0, 0.45, 0)
-    tween(logoScale, TweenInfo.new(0.65, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
-    tween(logo, SMOOTH, {ImageTransparency = 0, BackgroundTransparency = 0.92})
-    tween(logo, BOUNCE, {Size = UDim2.new(1, 0, 1, 0)})
+    task.wait(0.2)
+    logo.Size = UDim2.new(0.55, 0, 0.55, 0)
+    tween(logo,     SMOOTH, {ImageTransparency = 0})
+    tween(logo,     BOUNCE, {Size = UDim2.new(1, 0, 1, 0)})
     tween(title,    SMOOTH, {TextTransparency = 0})
     tween(subtitle, SMOOTH, {TextTransparency = 0})
     tween(loadingText, SMOOTH, {TextTransparency = 0})
@@ -414,7 +393,6 @@ local function showSplash()
     -- Animate out
     tween(splash, SMOOTH, {BackgroundTransparency = 1})
     tween(card,   SMOOTH, {Size = UDim2.new(0, 0, 0, 0)})
-    tween(logoScale, FAST, {Scale = 0.06})
     tween(logo,   FAST,   {ImageTransparency = 1})
     tween(title,  FAST,   {TextTransparency = 1})
     tween(subtitle, FAST, {TextTransparency = 1})
@@ -434,18 +412,16 @@ local Window = Instance.new("Frame")
 Window.Name = "Window"
 Window.AnchorPoint = Vector2.new(0.5, 0.5)
 Window.Position = UDim2.new(0.5, 0, 0.5, 0)
--- Full size immediately; splash (ZIndex 100+) covers this until it closes — avoids invisible 0×0 window
-Window.Size = TARGET_WIN_SIZE
+Window.Size = UDim2.new(0, 0, 0, 0) -- animated in
 Window.BackgroundColor3 = THEME.ShellWindow
 Window.BorderSizePixel = 0
 Window.ClipsDescendants = true
-Window.Visible = true
 Window.Parent = ScreenGui
-corner(Window, 22)
+corner(Window, 20)
 
--- Accent outline (rounded joins read smoother when the window is not clipping strokes)
-local winStroke = stroke(Window, THEME.PublixGreen, 1.25)
-winStroke.Transparency = 0.5
+-- Accent outline (script-hub style)
+local winStroke = stroke(Window, THEME.PublixGreen, 1)
+winStroke.Transparency = 0.65
 
 -- Soft drop shadow (outside the window)
 local shadow = Instance.new("ImageLabel")
@@ -470,9 +446,8 @@ Header.Name = "Header"
 Header.Size = UDim2.new(1, 0, 0, 64)
 Header.BackgroundColor3 = THEME.ShellHeader
 Header.BorderSizePixel = 0
-Header.ZIndex = 10
 Header.Parent = Window
-corner(Header, 22)
+corner(Header, 20)
 
 -- Subtle depth on dark header
 local headerGrad = Instance.new("UIGradient")
@@ -481,7 +456,6 @@ headerGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, THEME.ShellHeader),
 })
 headerGrad.Rotation = 90
-headerGrad.ZIndex = 1
 headerGrad.Parent = Header
 
 -- Publix accent strip (Cerberus-style top bar accent)
@@ -491,7 +465,6 @@ HeaderAccent.Position = UDim2.new(0, 0, 1, -2)
 HeaderAccent.Size = UDim2.new(1, 0, 0, 2)
 HeaderAccent.BackgroundColor3 = THEME.PublixGreen
 HeaderAccent.BorderSizePixel = 0
-HeaderAccent.ZIndex = 11
 HeaderAccent.Parent = Header
 
 -- Logo only (wordmark is in title area — avoids overlapping “BRIDGER CONTROL”)
@@ -506,7 +479,6 @@ HeaderLogo.BorderSizePixel = 0
 applyPublixLogoImage(HeaderLogo)
 HeaderLogo.ImageTransparency = 1
 HeaderLogo.ScaleType = Enum.ScaleType.Fit
-HeaderLogo.ZIndex = 11
 HeaderLogo.Parent = Header
 corner(HeaderLogo, 10)
 
@@ -520,7 +492,6 @@ HeaderTitle.Font = Enum.Font.GothamBold
 HeaderTitle.TextSize = 15
 HeaderTitle.TextColor3 = THEME.ShellText
 HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
-HeaderTitle.ZIndex = 11
 HeaderTitle.Parent = Header
 
 local HeaderSub = Instance.new("TextLabel")
@@ -534,7 +505,6 @@ HeaderSub.TextSize = 11
 HeaderSub.TextColor3 = THEME.ShellMuted
 HeaderSub.TextXAlignment = Enum.TextXAlignment.Left
 HeaderSub.TextTransparency = 0.05
-HeaderSub.ZIndex = 11
 HeaderSub.Parent = Header
 
 local HeaderBadge = Instance.new("TextLabel")
@@ -547,7 +517,6 @@ HeaderBadge.Text = "PUBLIX STYLE"
 HeaderBadge.Font = Enum.Font.GothamBold
 HeaderBadge.TextSize = 10
 HeaderBadge.TextColor3 = THEME.PublixGreenLite
-HeaderBadge.ZIndex = 12
 HeaderBadge.Parent = Header
 corner(HeaderBadge, 999)
 local badgeStroke = stroke(HeaderBadge, THEME.PublixGreen, 1)
@@ -566,7 +535,6 @@ local function makeControlBtn(text, xOffset)
     b.TextSize = 16
     b.TextColor3 = THEME.ShellText
     b.AutoButtonColor = false
-    b.ZIndex = 12
     b.Parent = Header
     corner(b, 999)
     return b
@@ -589,14 +557,14 @@ end
 local TabBar = Instance.new("Frame")
 TabBar.Name = "TabBar"
 TabBar.Position = UDim2.new(0, 0, 0, 64)
-TabBar.Size = UDim2.new(0, 182, 1, -64)
+TabBar.Size = UDim2.new(0, 160, 1, -64)
 TabBar.BackgroundColor3 = THEME.ShellSidebar
 TabBar.BackgroundTransparency = 0
 TabBar.BorderSizePixel = 0
-TabBar.ZIndex = 2
+TabBar.ZIndex = 3
 TabBar.ClipsDescendants = false
 TabBar.Parent = Window
--- No UICorner on sidebar: corner clipping was hiding bottom tabs (e.g. Keybinds) on some clients
+corner(TabBar, 20)
 
 -- Right-edge divider
 local TabDivider = Instance.new("Frame")
@@ -607,24 +575,21 @@ TabDivider.BackgroundColor3 = THEME.ShellLine
 TabDivider.BorderSizePixel = 0
 TabDivider.Parent = TabBar
 
-padding(TabBar, 10)
 local TabList = Instance.new("UIListLayout")
-TabList.Padding = UDim.new(0, 6)
+TabList.Padding = UDim.new(0, 4)
 TabList.SortOrder = Enum.SortOrder.LayoutOrder
-TabList.FillDirection = Enum.FillDirection.Vertical
-TabList.HorizontalAlignment = Enum.HorizontalAlignment.Left
-TabList.VerticalAlignment = Enum.VerticalAlignment.Top
 TabList.Parent = TabBar
+padding(TabBar, 12)
 
 local ContentArea = Instance.new("Frame")
 ContentArea.Name = "Content"
-ContentArea.Position = UDim2.new(0, 182, 0, 64)
-ContentArea.Size = UDim2.new(1, -182, 1, -64)
+ContentArea.Position = UDim2.new(0, 160, 0, 64)
+ContentArea.Size = UDim2.new(1, -160, 1, -64)
 ContentArea.BackgroundColor3 = THEME.ShellContent
 ContentArea.BorderSizePixel = 0
-ContentArea.ZIndex = 1
+ContentArea.ZIndex = 2
 ContentArea.Parent = Window
-corner(ContentArea, 14)
+corner(ContentArea, 20)
 
 local contentGrad = Instance.new("UIGradient")
 contentGrad.Rotation = 100
@@ -671,10 +636,8 @@ local function setActiveTab(tabData)
 end
 
 local function createTab(name, iconText)
-    local tabIndex = #tabs + 1
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -4, 0, 40)
-    btn.LayoutOrder = tabIndex
+    btn.Size = UDim2.new(1, 0, 0, 38)
     btn.BackgroundColor3 = THEME.ShellCard
     btn.BackgroundTransparency = 0.9
     btn.AutoButtonColor = false
@@ -713,7 +676,7 @@ local function createTab(name, iconText)
     lbl.Position = UDim2.new(0, 34, 0, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = name
-    lbl.Font = Enum.Font.GothamBold
+    lbl.Font = Enum.Font.GothamMedium
     lbl.TextSize = 13
     lbl.TextColor3 = THEME.TabText
     lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -724,12 +687,11 @@ local function createTab(name, iconText)
     page.Size = UDim2.new(1, 0, 1, 0)
     page.BackgroundTransparency = 1
     page.BorderSizePixel = 0
-    page.ZIndex = 1
-    page.ClipsDescendants = true
     page.ScrollBarThickness = 3
     page.ScrollBarImageColor3 = THEME.PublixGreen
     page.ScrollBarImageTransparency = 0.3
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
     page.Visible = false
     page.Parent = ContentArea
     padding(page, 18)
@@ -738,19 +700,6 @@ local function createTab(name, iconText)
     list.Padding = UDim.new(0, 10)
     list.SortOrder = Enum.SortOrder.LayoutOrder
     list.Parent = page
-
-    local function updatePageCanvas()
-        local ok, h = pcall(function()
-            return list.AbsoluteContentSize.Y
-        end)
-        if ok and type(h) == "number" then
-            page.CanvasSize = UDim2.new(0, 0, 0, math.max(math.ceil(h) + 32, 64))
-        end
-    end
-    pcall(function()
-        list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updatePageCanvas)
-    end)
-    task.defer(updatePageCanvas)
 
     local tab = { Button = btn, Label = lbl, Icon = icon, Page = page, Indicator = indicator, Stroke = btnStroke }
     table.insert(tabs, tab)
@@ -770,20 +719,6 @@ local function createTab(name, iconText)
     end)
 
     return tab
-end
-
-local function refreshAllTabCanvases()
-    pcall(function()
-        for _, t in ipairs(tabs) do
-            local listLayout = t.Page:FindFirstChildOfClass("UIListLayout")
-            if listLayout then
-                local h = listLayout.AbsoluteContentSize.Y
-                if type(h) == "number" then
-                    t.Page.CanvasSize = UDim2.new(0, 0, 0, math.max(math.ceil(h) + 32, 64))
-                end
-            end
-        end
-    end)
 end
 
 -- ============================================
@@ -1130,7 +1065,6 @@ addLabel(InfoTab, "Where Shopping is a Pleasure")
 
 -- Start on Main tab
 setActiveTab(MainTab)
-task.defer(refreshAllTabCanvases)
 
 -- ============================================
 -- NOTIFICATIONS
@@ -1265,6 +1199,9 @@ end)
 -- ============================================
 -- WINDOW ANIMATIONS
 -- ============================================
+local TARGET_WIN_SIZE = UDim2.new(0, 620, 0, 400)
+local minimized = false
+
 local function setMenuBackdropExpanded(expanded)
     if expanded then
         Backdrop.Visible = true
@@ -1282,10 +1219,10 @@ local function setMenuBackdropExpanded(expanded)
 end
 
 task.spawn(function()
-    task.wait(2.0) -- after splash; window is already full size
-    if menuGuiOpen and HeaderLogo.Parent then
+    task.wait(2.0) -- wait for splash
+    if menuGuiOpen then
+        tween(Window, BOUNCE, {Size = TARGET_WIN_SIZE})
         tween(HeaderLogo, SMOOTH, {ImageTransparency = 0})
-        task.defer(refreshAllTabCanvases)
     end
 end)
 
@@ -1293,16 +1230,11 @@ local function minimizeWindow()
     if not menuGuiOpen then return end
     minimized = not minimized
     if minimized then
-        TabBar.Visible = false
-        ContentArea.Visible = false
         setMenuBackdropExpanded(false)
         tween(Window, SMOOTH, {Size = UDim2.new(0, 620, 0, 64)})
     else
-        TabBar.Visible = true
-        ContentArea.Visible = true
         setMenuBackdropExpanded(true)
         tween(Window, SMOOTH, {Size = TARGET_WIN_SIZE})
-        task.defer(refreshAllTabCanvases)
     end
 end
 
@@ -1315,16 +1247,11 @@ local function syncMenuGuiVisibility()
     end
     minimized = menuGuiWasMinimized
     if minimized then
-        TabBar.Visible = false
-        ContentArea.Visible = false
         tween(Window, FAST, {Size = UDim2.new(0, 620, 0, 64)})
         setMenuBackdropExpanded(false)
     else
-        TabBar.Visible = true
-        ContentArea.Visible = true
         tween(Window, GLIDE, {Size = TARGET_WIN_SIZE})
         setMenuBackdropExpanded(true)
-        task.defer(refreshAllTabCanvases)
     end
 end
 
@@ -1413,9 +1340,6 @@ table.insert(connections, UIS.InputBegan:Connect(function(i, gp)
     if gp then return end
     if i.UserInputType ~= Enum.UserInputType.Keyboard then return end
     if i.KeyCode == menuToggleKey then
-        local now = os.clock()
-        if now - lastMenuToggleT < 0.25 then return end
-        lastMenuToggleT = now
         menuGuiOpen = not menuGuiOpen
         syncMenuGuiVisibility()
         return
@@ -1799,7 +1723,7 @@ end)
 -- ENTRY POINT
 -- ============================================
 setStatus("Waiting for Play click...")
-print("[Script] Loaded! Q = pause | P = unload | Insert = menu")
+print("[Script] Loaded! Q = toggle | P = unload")
 notify(
     "Publix Edition",
     "Keys: " .. toggleKey.Name .. " = pause script · " .. unloadKey.Name .. " = unload · " .. menuToggleKey.Name .. " = hide/show menu.",
@@ -1810,4 +1734,3 @@ local _ = player.Character or player.CharacterAdded:Wait()
 task.wait(LOAD_WAIT)
 runStartupScan()
 print("[Script] Active!")
-
