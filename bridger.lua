@@ -43,9 +43,28 @@ local toggleKey         = Enum.KeyCode.Q
 local unloadKey         = Enum.KeyCode.P
 
 -- ============================================
--- PUBLIX THEME
+-- PUBLIX THEME (+ dark “script hub” shell like Cerberus-style UIs)
 -- ============================================
-local PUBLIX_LOGO_ID = "rbxassetid://131474144341584"
+local PUBLIX_LOGO_ASSET_ID = "131474144341584"
+-- rbxthumb often resolves when rbxassetid thumbnails fail in-game
+local PUBLIX_LOGO_PRIMARY = "rbxthumb://type=Asset&id=" .. PUBLIX_LOGO_ASSET_ID .. "&w=420&h=420"
+local PUBLIX_LOGO_FALLBACK = "rbxassetid://" .. PUBLIX_LOGO_ASSET_ID
+
+local function applyPublixLogoImage(img)
+    -- Try rbxassetid first (your upload), then rbxthumb (often works when direct image fails)
+    img.Image = PUBLIX_LOGO_FALLBACK
+    pcall(function()
+        ContentProvider:PreloadAsync({img})
+    end)
+    task.delay(0.5, function()
+        if img.Parent then
+            img.Image = PUBLIX_LOGO_PRIMARY
+            pcall(function()
+                ContentProvider:PreloadAsync({img})
+            end)
+        end
+    end)
+end
 
 local THEME = {
     PublixGreen     = Color3.fromRGB(0, 122, 51),     -- #007A33 Publix brand green
@@ -63,6 +82,16 @@ local THEME = {
     ToggleOff       = Color3.fromRGB(210, 218, 212),
     Divider         = Color3.fromRGB(228, 238, 230),
     CardBorder      = Color3.fromRGB(222, 234, 224),
+    -- Dark shell (Cerebus / exploit-hub style) + Publix accents
+    ShellWindow     = Color3.fromRGB(18, 19, 24),
+    ShellHeader     = Color3.fromRGB(22, 23, 30),
+    ShellSidebar    = Color3.fromRGB(26, 27, 34),
+    ShellContent    = Color3.fromRGB(20, 21, 27),
+    ShellCard       = Color3.fromRGB(32, 34, 42),
+    ShellLine       = Color3.fromRGB(48, 52, 64),
+    ShellText       = Color3.fromRGB(236, 237, 242),
+    ShellMuted      = Color3.fromRGB(148, 152, 165),
+    ShellToggleOff  = Color3.fromRGB(52, 55, 66),
 }
 
 local FAST  = TweenInfo.new(0.16, Enum.EasingStyle.Quad,  Enum.EasingDirection.Out)
@@ -237,20 +266,33 @@ local function showSplash()
     logoHolder.ZIndex = 103
     logoHolder.Parent = card
 
+    local splashWord = Instance.new("TextLabel")
+    splashWord.AnchorPoint = Vector2.new(0.5, 0.5)
+    splashWord.Position = UDim2.new(0.5, 0, 0.5, 0)
+    splashWord.Size = UDim2.new(1, 0, 0, 36)
+    splashWord.BackgroundTransparency = 1
+    splashWord.Text = "PUBLIX"
+    splashWord.Font = Enum.Font.GothamBlack
+    splashWord.TextSize = 28
+    splashWord.TextColor3 = THEME.PublixGreen
+    splashWord.TextTransparency = 0.25
+    splashWord.ZIndex = 103
+    splashWord.Parent = logoHolder
+
     local logo = Instance.new("ImageLabel")
     logo.AnchorPoint = Vector2.new(0.5, 0.5)
     logo.Position = UDim2.new(0.5, 0, 0.5, 0)
     logo.Size = UDim2.new(1, 0, 1, 0)
-    logo.BackgroundTransparency = 1
-    logo.Image = PUBLIX_LOGO_ID
-    pcall(function()
-        ContentProvider:PreloadAsync({logo})
-    end)
+    logo.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    logo.BackgroundTransparency = 0.88
+    logo.BorderSizePixel = 0
+    applyPublixLogoImage(logo)
     logo.ImageTransparency = 1
     logo.ScaleType = Enum.ScaleType.Fit
     logo.Rotation = 0
     logo.ZIndex = 104
     logo.Parent = logoHolder
+    corner(logo, 12)
 
     -- Orbit ring behind logo
     local ring = Instance.new("Frame")
@@ -331,21 +373,10 @@ local function showSplash()
     })
     barGrad.Parent = barFG
 
-    -- Continuous spin on logo
-    local spinning = true
-    task.spawn(function()
-        local rot = 0
-        while spinning and logo.Parent do
-            rot = (rot + 3) % 360
-            logo.Rotation = rot
-            task.wait(1 / 60)
-        end
-    end)
-
     -- Animate in
     tween(card, BOUNCE, {Size = UDim2.new(0, 340, 0, 280)})
     task.wait(0.2)
-    logo.Size = UDim2.new(0.7, 0, 0.7, 0)
+    logo.Size = UDim2.new(0.55, 0, 0.55, 0)
     tween(logo,     SMOOTH, {ImageTransparency = 0})
     tween(logo,     BOUNCE, {Size = UDim2.new(1, 0, 1, 0)})
     tween(title,    SMOOTH, {TextTransparency = 0})
@@ -363,7 +394,6 @@ local function showSplash()
     task.wait(1.8)
 
     -- Animate out
-    spinning = false
     tween(splash, SMOOTH, {BackgroundTransparency = 1})
     tween(card,   SMOOTH, {Size = UDim2.new(0, 0, 0, 0)})
     tween(logo,   FAST,   {ImageTransparency = 1})
@@ -386,15 +416,15 @@ Window.Name = "Window"
 Window.AnchorPoint = Vector2.new(0.5, 0.5)
 Window.Position = UDim2.new(0.5, 0, 0.5, 0)
 Window.Size = UDim2.new(0, 0, 0, 0) -- animated in
-Window.BackgroundColor3 = THEME.LightBG
+Window.BackgroundColor3 = THEME.ShellWindow
 Window.BorderSizePixel = 0
 Window.ClipsDescendants = true
 Window.Parent = ScreenGui
 corner(Window, 16)
 
--- Subtle 1px hairline border
-local winStroke = stroke(Window, Color3.fromRGB(215, 228, 218), 1)
-winStroke.Transparency = 0.2
+-- Accent outline (script-hub style)
+local winStroke = stroke(Window, THEME.PublixGreen, 1)
+winStroke.Transparency = 0.65
 
 -- Soft drop shadow (outside the window)
 local shadow = Instance.new("ImageLabel")
@@ -404,8 +434,8 @@ shadow.Position = UDim2.new(0.5, 0, 0.5, 10)
 shadow.Size = UDim2.new(1, 60, 1, 60)
 shadow.BackgroundTransparency = 1
 shadow.Image = "rbxassetid://6014261993"
-shadow.ImageColor3 = Color3.fromRGB(0, 30, 14)
-shadow.ImageTransparency = 0.7
+shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+shadow.ImageTransparency = 0.55
 shadow.ScaleType = Enum.ScaleType.Slice
 shadow.SliceCenter = Rect.new(49, 49, 450, 450)
 shadow.ZIndex = 0
@@ -417,77 +447,102 @@ shadow.Parent = Window
 local Header = Instance.new("Frame")
 Header.Name = "Header"
 Header.Size = UDim2.new(1, 0, 0, 64)
-Header.BackgroundColor3 = THEME.PublixGreen
+Header.BackgroundColor3 = THEME.ShellHeader
 Header.BorderSizePixel = 0
 Header.Parent = Window
 corner(Header, 16)
 
--- Gradient adds depth
+-- Subtle depth on dark header
 local headerGrad = Instance.new("UIGradient")
 headerGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, THEME.PublixGreenLite),
-    ColorSequenceKeypoint.new(1, THEME.PublixGreen),
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(34, 36, 46)),
+    ColorSequenceKeypoint.new(1, THEME.ShellHeader),
 })
 headerGrad.Rotation = 90
 headerGrad.Parent = Header
 
--- Thin divider beneath header
-local HeaderDivider = Instance.new("Frame")
-HeaderDivider.Position = UDim2.new(0, 0, 1, 0)
-HeaderDivider.Size = UDim2.new(1, 0, 0, 1)
-HeaderDivider.BackgroundColor3 = THEME.Divider
-HeaderDivider.BorderSizePixel = 0
-HeaderDivider.Parent = Header
+-- Publix accent strip (Cerberus-style top bar accent)
+local HeaderAccent = Instance.new("Frame")
+HeaderAccent.Name = "Accent"
+HeaderAccent.Position = UDim2.new(0, 0, 1, -2)
+HeaderAccent.Size = UDim2.new(1, 0, 0, 2)
+HeaderAccent.BackgroundColor3 = THEME.PublixGreen
+HeaderAccent.BorderSizePixel = 0
+HeaderAccent.Parent = Header
 
--- Logo in header
+-- Logo slot: image + always-visible wordmark (asset can still fail in some clients)
+local LogoSlot = Instance.new("Frame")
+LogoSlot.Name = "LogoSlot"
+LogoSlot.AnchorPoint = Vector2.new(0, 0.5)
+LogoSlot.Position = UDim2.new(0, 14, 0.5, 0)
+LogoSlot.Size = UDim2.new(0, 112, 0, 40)
+LogoSlot.BackgroundTransparency = 1
+LogoSlot.Parent = Header
+
+local HeaderWord = Instance.new("TextLabel")
+HeaderWord.Size = UDim2.new(0, 64, 1, 0)
+HeaderWord.Position = UDim2.new(0, 0, 0, 0)
+HeaderWord.BackgroundTransparency = 1
+HeaderWord.Text = "PUBLIX"
+HeaderWord.Font = Enum.Font.GothamBlack
+HeaderWord.TextSize = 13
+HeaderWord.TextColor3 = THEME.PublixGreen
+HeaderWord.TextXAlignment = Enum.TextXAlignment.Left
+HeaderWord.Parent = LogoSlot
+
 local HeaderLogo = Instance.new("ImageLabel")
 HeaderLogo.Name = "Logo"
-HeaderLogo.AnchorPoint = Vector2.new(0, 0.5)
-HeaderLogo.Position = UDim2.new(0, 16, 0.5, 0)
+HeaderLogo.AnchorPoint = Vector2.new(1, 0.5)
+HeaderLogo.Position = UDim2.new(1, 0, 0.5, 0)
 HeaderLogo.Size = UDim2.new(0, 40, 0, 40)
-HeaderLogo.BackgroundTransparency = 1
-HeaderLogo.Image = PUBLIX_LOGO_ID
+HeaderLogo.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+HeaderLogo.BackgroundTransparency = 0.9
+HeaderLogo.BorderSizePixel = 0
+applyPublixLogoImage(HeaderLogo)
 HeaderLogo.ImageTransparency = 1
 HeaderLogo.ScaleType = Enum.ScaleType.Fit
-HeaderLogo.Parent = Header
+HeaderLogo.Parent = LogoSlot
+corner(HeaderLogo, 8)
 
 local HeaderTitle = Instance.new("TextLabel")
 HeaderTitle.AnchorPoint = Vector2.new(0, 0.5)
-HeaderTitle.Position = UDim2.new(0, 66, 0.5, -9)
-HeaderTitle.Size = UDim2.new(1, -180, 0, 20)
+HeaderTitle.Position = UDim2.new(0, 134, 0.5, -9)
+HeaderTitle.Size = UDim2.new(1, -260, 0, 20)
 HeaderTitle.BackgroundTransparency = 1
 HeaderTitle.Text = "BRIDGER CONTROL"
 HeaderTitle.Font = Enum.Font.GothamBold
 HeaderTitle.TextSize = 15
-HeaderTitle.TextColor3 = THEME.TextOnGreen
+HeaderTitle.TextColor3 = THEME.ShellText
 HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
 HeaderTitle.Parent = Header
 
 local HeaderSub = Instance.new("TextLabel")
 HeaderSub.AnchorPoint = Vector2.new(0, 0.5)
 HeaderSub.Position = UDim2.new(0, 66, 0.5, 11)
-HeaderSub.Size = UDim2.new(1, -180, 0, 16)
+HeaderSub.Size = UDim2.new(1, -260, 0, 16)
 HeaderSub.BackgroundTransparency = 1
 HeaderSub.Text = "Publix Edition  |  Saint Corpse Collector"
 HeaderSub.Font = Enum.Font.Gotham
 HeaderSub.TextSize = 11
-HeaderSub.TextColor3 = Color3.fromRGB(220, 245, 225)
+HeaderSub.TextColor3 = THEME.ShellMuted
 HeaderSub.TextXAlignment = Enum.TextXAlignment.Left
-HeaderSub.TextTransparency = 0.15
+HeaderSub.TextTransparency = 0.05
 HeaderSub.Parent = Header
 
 local HeaderBadge = Instance.new("TextLabel")
 HeaderBadge.AnchorPoint = Vector2.new(1, 0.5)
-HeaderBadge.Position = UDim2.new(1, -92, 0.5, 0)
-HeaderBadge.Size = UDim2.new(0, 150, 0, 24)
-HeaderBadge.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-HeaderBadge.BackgroundTransparency = 0.8
+HeaderBadge.Position = UDim2.new(1, -208, 0.5, 0)
+HeaderBadge.Size = UDim2.new(0, 120, 0, 24)
+HeaderBadge.BackgroundColor3 = THEME.ShellCard
+HeaderBadge.BackgroundTransparency = 0.2
 HeaderBadge.Text = "PUBLIX STYLE"
 HeaderBadge.Font = Enum.Font.GothamBold
 HeaderBadge.TextSize = 10
-HeaderBadge.TextColor3 = THEME.TextOnGreen
+HeaderBadge.TextColor3 = THEME.PublixGreenLite
 HeaderBadge.Parent = Header
 corner(HeaderBadge, 999)
+local badgeStroke = stroke(HeaderBadge, THEME.PublixGreen, 1)
+badgeStroke.Transparency = 0.55
 
 -- Window controls (minimize + close) with circular minimalist style
 local function makeControlBtn(text, xOffset)
@@ -495,12 +550,12 @@ local function makeControlBtn(text, xOffset)
     b.AnchorPoint = Vector2.new(1, 0.5)
     b.Position = UDim2.new(1, xOffset, 0.5, 0)
     b.Size = UDim2.new(0, 28, 0, 28)
-    b.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    b.BackgroundTransparency = 0.82
+    b.BackgroundColor3 = THEME.ShellCard
+    b.BackgroundTransparency = 0.35
     b.Text = text
     b.Font = Enum.Font.GothamBold
     b.TextSize = 16
-    b.TextColor3 = THEME.TextOnGreen
+    b.TextColor3 = THEME.ShellText
     b.AutoButtonColor = false
     b.Parent = Header
     corner(b, 999)
@@ -514,7 +569,7 @@ for _, btn in ipairs({CloseBtn, MinBtn}) do
         tween(btn, FAST, {BackgroundTransparency = 0.55})
     end)
     btn.MouseLeave:Connect(function()
-        tween(btn, FAST, {BackgroundTransparency = 0.82})
+        tween(btn, FAST, {BackgroundTransparency = 0.35})
     end)
 end
 
@@ -525,8 +580,8 @@ local TabBar = Instance.new("Frame")
 TabBar.Name = "TabBar"
 TabBar.Position = UDim2.new(0, 0, 0, 64)
 TabBar.Size = UDim2.new(0, 160, 1, -64)
-TabBar.BackgroundColor3 = THEME.LightBG2
-TabBar.BackgroundTransparency = 0.25
+TabBar.BackgroundColor3 = THEME.ShellSidebar
+TabBar.BackgroundTransparency = 0
 TabBar.BorderSizePixel = 0
 TabBar.Parent = Window
 corner(TabBar, 16)
@@ -536,7 +591,7 @@ local TabDivider = Instance.new("Frame")
 TabDivider.AnchorPoint = Vector2.new(1, 0)
 TabDivider.Position = UDim2.new(1, 0, 0, 0)
 TabDivider.Size = UDim2.new(0, 1, 1, 0)
-TabDivider.BackgroundColor3 = THEME.Divider
+TabDivider.BackgroundColor3 = THEME.ShellLine
 TabDivider.BorderSizePixel = 0
 TabDivider.Parent = TabBar
 
@@ -550,7 +605,7 @@ local ContentArea = Instance.new("Frame")
 ContentArea.Name = "Content"
 ContentArea.Position = UDim2.new(0, 160, 0, 64)
 ContentArea.Size = UDim2.new(1, -160, 1, -64)
-ContentArea.BackgroundColor3 = THEME.LightBG
+ContentArea.BackgroundColor3 = THEME.ShellContent
 ContentArea.BorderSizePixel = 0
 ContentArea.Parent = Window
 corner(ContentArea, 16)
@@ -558,8 +613,8 @@ corner(ContentArea, 16)
 local contentGrad = Instance.new("UIGradient")
 contentGrad.Rotation = 100
 contentGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(252, 255, 252)),
-    ColorSequenceKeypoint.new(1, THEME.LightBG),
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 30, 38)),
+    ColorSequenceKeypoint.new(1, THEME.ShellContent),
 })
 contentGrad.Parent = ContentArea
 
@@ -573,13 +628,13 @@ local function setActiveTab(tabData)
         local active = (t == tabData)
         tween(t.Button, FAST, {
             BackgroundTransparency = active and 0 or 1,
-            BackgroundColor3 = active and THEME.CardBG or THEME.CardBG,
+            BackgroundColor3 = active and THEME.ShellCard or THEME.ShellCard,
         })
         tween(t.Label, FAST, {
-            TextColor3 = active and THEME.PublixGreen or THEME.TextMid
+            TextColor3 = active and THEME.PublixGreenLite or THEME.ShellMuted
         })
         tween(t.Icon, FAST, {
-            TextColor3 = active and THEME.PublixGreen or THEME.TextMid
+            TextColor3 = active and THEME.PublixGreenLite or THEME.ShellMuted
         })
         tween(t.Stroke, FAST, {
             Transparency = active and 0.25 or 1
@@ -602,13 +657,13 @@ end
 local function createTab(name, iconText)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 38)
-    btn.BackgroundColor3 = THEME.CardBG
+    btn.BackgroundColor3 = THEME.ShellCard
     btn.BackgroundTransparency = 1
     btn.AutoButtonColor = false
     btn.Text = ""
     btn.Parent = TabBar
     corner(btn, 10)
-    local btnStroke = stroke(btn, THEME.CardBorder, 1)
+    local btnStroke = stroke(btn, THEME.ShellLine, 1)
     btnStroke.Transparency = 1
 
     -- Left indicator pill
@@ -629,7 +684,7 @@ local function createTab(name, iconText)
     icon.Text = iconText or "[ ]"
     icon.Font = Enum.Font.GothamBold
     icon.TextSize = 11
-    icon.TextColor3 = THEME.TextMid
+    icon.TextColor3 = THEME.ShellMuted
     icon.TextXAlignment = Enum.TextXAlignment.Left
     icon.Parent = btn
 
@@ -640,7 +695,7 @@ local function createTab(name, iconText)
     lbl.Text = name
     lbl.Font = Enum.Font.GothamMedium
     lbl.TextSize = 13
-    lbl.TextColor3 = THEME.TextMid
+    lbl.TextColor3 = THEME.ShellMuted
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = btn
 
@@ -697,7 +752,7 @@ local function addSection(tab, title)
     s.Text = string.upper(title)
     s.Font = Enum.Font.GothamBold
     s.TextSize = 11
-    s.TextColor3 = THEME.Muted
+    s.TextColor3 = THEME.ShellMuted
     s.TextXAlignment = Enum.TextXAlignment.Left
     s.Parent = holder
     return holder
@@ -706,12 +761,12 @@ end
 local function addLabel(tab, text)
     local holder = Instance.new("Frame")
     holder.Size = UDim2.new(1, 0, 0, 36)
-    holder.BackgroundColor3 = THEME.CardBG
+    holder.BackgroundColor3 = THEME.ShellCard
     holder.BorderSizePixel = 0
     holder.Parent = tab.Page
     corner(holder, 10)
-    local holderStroke = stroke(holder, THEME.CardBorder, 1)
-    holderStroke.Transparency = 0.45
+    local holderStroke = stroke(holder, THEME.ShellLine, 1)
+    holderStroke.Transparency = 0.55
 
     -- Subtle green accent dot
     local dot = Instance.new("Frame")
@@ -730,7 +785,7 @@ local function addLabel(tab, text)
     lbl.Text = text
     lbl.Font = Enum.Font.Gotham
     lbl.TextSize = 13
-    lbl.TextColor3 = THEME.TextDark
+    lbl.TextColor3 = THEME.ShellText
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = holder
 
@@ -743,13 +798,13 @@ end
 local function addToggle(tab, name, initial, callback)
     local holder = Instance.new("TextButton")
     holder.Size = UDim2.new(1, 0, 0, 44)
-    holder.BackgroundColor3 = THEME.CardBG
+    holder.BackgroundColor3 = THEME.ShellCard
     holder.AutoButtonColor = false
     holder.Text = ""
     holder.Parent = tab.Page
     corner(holder, 10)
-    local holderStroke = stroke(holder, THEME.CardBorder, 1)
-    holderStroke.Transparency = 0.45
+    local holderStroke = stroke(holder, THEME.ShellLine, 1)
+    holderStroke.Transparency = 0.55
 
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, -76, 1, 0)
@@ -758,7 +813,7 @@ local function addToggle(tab, name, initial, callback)
     lbl.Text = name
     lbl.Font = Enum.Font.GothamMedium
     lbl.TextSize = 13
-    lbl.TextColor3 = THEME.TextDark
+    lbl.TextColor3 = THEME.ShellText
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = holder
 
@@ -767,7 +822,7 @@ local function addToggle(tab, name, initial, callback)
     track.AnchorPoint = Vector2.new(1, 0.5)
     track.Position = UDim2.new(1, -14, 0.5, 0)
     track.Size = UDim2.new(0, 44, 0, 24)
-    track.BackgroundColor3 = initial and THEME.PublixGreen or THEME.ToggleOff
+    track.BackgroundColor3 = initial and THEME.PublixGreen or THEME.ShellToggleOff
     track.BorderSizePixel = 0
     track.Parent = holder
     corner(track, 12)
@@ -798,7 +853,7 @@ local function addToggle(tab, name, initial, callback)
 
     local function set(v)
         value = v and true or false
-        tween(track, FAST, {BackgroundColor3 = value and THEME.PublixGreen or THEME.ToggleOff})
+        tween(track, FAST, {BackgroundColor3 = value and THEME.PublixGreen or THEME.ShellToggleOff})
         tween(knob, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             Position = value and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
         })
@@ -807,12 +862,12 @@ local function addToggle(tab, name, initial, callback)
 
     holder.MouseButton1Click:Connect(function() set(not value) end)
     holder.MouseEnter:Connect(function()
-        tween(holder, FAST, {BackgroundColor3 = Color3.fromRGB(250, 254, 250)})
-        tween(holderStroke, FAST, {Transparency = 0.15})
+        tween(holder, FAST, {BackgroundColor3 = Color3.fromRGB(40, 42, 52)})
+        tween(holderStroke, FAST, {Transparency = 0.25})
     end)
     holder.MouseLeave:Connect(function()
-        tween(holder, FAST, {BackgroundColor3 = THEME.CardBG})
-        tween(holderStroke, FAST, {Transparency = 0.45})
+        tween(holder, FAST, {BackgroundColor3 = THEME.ShellCard})
+        tween(holderStroke, FAST, {Transparency = 0.55})
     end)
 
     return {
@@ -978,13 +1033,13 @@ notify = function(title, body, duration)
     local card = Instance.new("Frame")
     card.Size = UDim2.new(0, 300, 0, 0)
     card.AutomaticSize = Enum.AutomaticSize.Y
-    card.BackgroundColor3 = THEME.CardBG
+    card.BackgroundColor3 = THEME.ShellCard
     card.BorderSizePixel = 0
     card.Position = UDim2.new(1, 320, 0, 0)
     card.Parent = NotifRoot
     corner(card, 12)
-    local s = stroke(card, THEME.Divider, 1)
-    s.Transparency = 0.3
+    local s = stroke(card, THEME.ShellLine, 1)
+    s.Transparency = 0.45
 
     -- Soft shadow
     local sh = Instance.new("ImageLabel")
@@ -993,7 +1048,7 @@ notify = function(title, body, duration)
     sh.Size = UDim2.new(1, 30, 1, 30)
     sh.BackgroundTransparency = 1
     sh.Image = "rbxassetid://6014261993"
-    sh.ImageColor3 = Color3.fromRGB(0, 30, 14)
+    sh.ImageColor3 = Color3.fromRGB(0, 0, 0)
     sh.ImageTransparency = 0.82
     sh.ScaleType = Enum.ScaleType.Slice
     sh.SliceCenter = Rect.new(49, 49, 450, 450)
@@ -1009,7 +1064,7 @@ notify = function(title, body, duration)
     local logoBG = Instance.new("Frame")
     logoBG.Position = UDim2.new(0, 14, 0, 12)
     logoBG.Size = UDim2.new(0, 30, 0, 30)
-    logoBG.BackgroundColor3 = THEME.LightBG2
+    logoBG.BackgroundColor3 = THEME.ShellSidebar
     logoBG.BorderSizePixel = 0
     logoBG.Parent = card
     corner(logoBG, 999)
@@ -1019,7 +1074,7 @@ notify = function(title, body, duration)
     logo.Position = UDim2.new(0.5, 0, 0.5, 0)
     logo.Size = UDim2.new(0, 22, 0, 22)
     logo.BackgroundTransparency = 1
-    logo.Image = PUBLIX_LOGO_ID
+    applyPublixLogoImage(logo)
     logo.ScaleType = Enum.ScaleType.Fit
     logo.Parent = logoBG
 
@@ -1042,7 +1097,7 @@ notify = function(title, body, duration)
     b.Text = body
     b.Font = Enum.Font.Gotham
     b.TextSize = 12
-    b.TextColor3 = THEME.TextMid
+    b.TextColor3 = THEME.ShellMuted
     b.TextWrapped = true
     b.TextXAlignment = Enum.TextXAlignment.Left
     b.Parent = card
@@ -1092,6 +1147,22 @@ end)
 local TARGET_WIN_SIZE = UDim2.new(0, 620, 0, 400)
 local minimized = false
 
+local function setMenuBackdropExpanded(expanded)
+    if expanded then
+        Backdrop.Visible = true
+        tween(Backdrop, SMOOTH, {BackgroundTransparency = 0.3})
+        tween(menuBlur, GLIDE, {Size = MENU_BLUR_SIZE})
+    else
+        tween(menuBlur, FAST, {Size = 0})
+        tween(Backdrop, FAST, {BackgroundTransparency = 1})
+        task.delay(0.35, function()
+            if Backdrop.Parent and minimized then
+                Backdrop.Visible = false
+            end
+        end)
+    end
+end
+
 task.spawn(function()
     task.wait(2.0) -- wait for splash
     tween(Window, BOUNCE, {Size = TARGET_WIN_SIZE})
@@ -1101,8 +1172,10 @@ end)
 local function minimizeWindow()
     minimized = not minimized
     if minimized then
+        setMenuBackdropExpanded(false)
         tween(Window, SMOOTH, {Size = UDim2.new(0, 620, 0, 64)})
     else
+        setMenuBackdropExpanded(true)
         tween(Window, SMOOTH, {Size = TARGET_WIN_SIZE})
     end
 end
@@ -1112,6 +1185,8 @@ local function closeWindow()
 end
 
 local function openWindow()
+    minimized = false
+    setMenuBackdropExpanded(true)
     tween(Window, BOUNCE, {Size = TARGET_WIN_SIZE})
 end
 
