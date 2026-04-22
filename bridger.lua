@@ -11,6 +11,7 @@ local TeleportService = game:GetService("TeleportService")
 local TweenService    = game:GetService("TweenService")
 local RunService      = game:GetService("RunService")
 local Lighting        = game:GetService("Lighting")
+local ContentProvider = game:GetService("ContentProvider")
 
 local player = Players.LocalPlayer
 while not player do
@@ -38,8 +39,8 @@ local LOAD_WAIT         = 3
 local MAX_GROUND_DIST   = 15
 local CLOSE_HIT_DIST    = 8
 local MENU_BLUR_SIZE    = 10
-local TOGGLE_KEY        = Enum.KeyCode.Q
-local UNLOAD_KEY        = Enum.KeyCode.P
+local toggleKey         = Enum.KeyCode.Q
+local unloadKey         = Enum.KeyCode.P
 
 -- ============================================
 -- PUBLIX THEME
@@ -86,6 +87,7 @@ local runStartupScan
 local unloadScript
 local setStatus
 local setStand
+local notify
 
 -- ============================================
 -- UI HELPERS
@@ -241,6 +243,9 @@ local function showSplash()
     logo.Size = UDim2.new(1, 0, 1, 0)
     logo.BackgroundTransparency = 1
     logo.Image = PUBLIX_LOGO_ID
+    pcall(function()
+        ContentProvider:PreloadAsync({logo})
+    end)
     logo.ImageTransparency = 1
     logo.ScaleType = Enum.ScaleType.Fit
     logo.Rotation = 0
@@ -305,6 +310,19 @@ local function showSplash()
     barFG.Parent = barBG
     corner(barFG, 2)
 
+    local loadingText = Instance.new("TextLabel")
+    loadingText.AnchorPoint = Vector2.new(0.5, 1)
+    loadingText.Position = UDim2.new(0.5, 0, 1, -30)
+    loadingText.Size = UDim2.new(1, -48, 0, 16)
+    loadingText.BackgroundTransparency = 1
+    loadingText.Text = "Loading 0%"
+    loadingText.Font = Enum.Font.GothamMedium
+    loadingText.TextSize = 11
+    loadingText.TextColor3 = THEME.TextMid
+    loadingText.TextTransparency = 1
+    loadingText.ZIndex = 104
+    loadingText.Parent = card
+
     -- Gradient on progress bar
     local barGrad = Instance.new("UIGradient")
     barGrad.Color = ColorSequence.new({
@@ -327,10 +345,20 @@ local function showSplash()
     -- Animate in
     tween(card, BOUNCE, {Size = UDim2.new(0, 340, 0, 280)})
     task.wait(0.2)
+    logo.Size = UDim2.new(0.7, 0, 0.7, 0)
     tween(logo,     SMOOTH, {ImageTransparency = 0})
+    tween(logo,     BOUNCE, {Size = UDim2.new(1, 0, 1, 0)})
     tween(title,    SMOOTH, {TextTransparency = 0})
     tween(subtitle, SMOOTH, {TextTransparency = 0})
-    tween(barFG,    TweenInfo.new(1.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)})
+    tween(loadingText, SMOOTH, {TextTransparency = 0})
+    task.spawn(function()
+        for pct = 0, 100, 5 do
+            if not splash.Parent then return end
+            loadingText.Text = ("Loading %d%%"):format(pct)
+            barFG.Size = UDim2.new(pct / 100, 0, 1, 0)
+            task.wait(0.08)
+        end
+    end)
 
     task.wait(1.8)
 
@@ -341,6 +369,7 @@ local function showSplash()
     tween(logo,   FAST,   {ImageTransparency = 1})
     tween(title,  FAST,   {TextTransparency = 1})
     tween(subtitle, FAST, {TextTransparency = 1})
+    tween(loadingText, FAST, {TextTransparency = 1})
     tween(blur,   GLIDE,  {Size = 0})
     task.wait(0.45)
     splash:Destroy()
@@ -391,6 +420,7 @@ Header.Size = UDim2.new(1, 0, 0, 64)
 Header.BackgroundColor3 = THEME.PublixGreen
 Header.BorderSizePixel = 0
 Header.Parent = Window
+corner(Header, 16)
 
 -- Gradient adds depth
 local headerGrad = Instance.new("UIGradient")
@@ -417,6 +447,7 @@ HeaderLogo.Position = UDim2.new(0, 16, 0.5, 0)
 HeaderLogo.Size = UDim2.new(0, 40, 0, 40)
 HeaderLogo.BackgroundTransparency = 1
 HeaderLogo.Image = PUBLIX_LOGO_ID
+HeaderLogo.ImageTransparency = 1
 HeaderLogo.ScaleType = Enum.ScaleType.Fit
 HeaderLogo.Parent = Header
 
@@ -498,6 +529,7 @@ TabBar.BackgroundColor3 = THEME.LightBG2
 TabBar.BackgroundTransparency = 0.25
 TabBar.BorderSizePixel = 0
 TabBar.Parent = Window
+corner(TabBar, 16)
 
 -- Right-edge divider
 local TabDivider = Instance.new("Frame")
@@ -521,6 +553,7 @@ ContentArea.Size = UDim2.new(1, -160, 1, -64)
 ContentArea.BackgroundColor3 = THEME.LightBG
 ContentArea.BorderSizePixel = 0
 ContentArea.Parent = Window
+corner(ContentArea, 16)
 
 local contentGrad = Instance.new("UIGradient")
 contentGrad.Rotation = 100
@@ -836,11 +869,13 @@ end
 -- ============================================
 local MainTab  = createTab("Main", "[M]")
 local StandTab = createTab("Stands", "[S]")
+local KeybindTab = createTab("Keybinds", "[K]")
 local InfoTab  = createTab("About", "[I]")
 
 addSection(MainTab, "Info")
 local StatusElement = addLabel(MainTab, "Status: Waiting...")
 local StandElement  = addLabel(MainTab, "Last Stand: None")
+local RuntimeElement = addLabel(MainTab, "Run Time: 00:00:00")
 
 addSection(MainTab, "Features")
 local collectorToggleCtl
@@ -856,7 +891,7 @@ end)
 
 addSection(MainTab, "Control")
 local masterToggleCtl
-masterToggleCtl = addToggle(MainTab, "Script Active [Q]", running, function(s)
+masterToggleCtl = addToggle(MainTab, "Script Active", running, function(s)
     running = s
     if running then
         setStatus("Resumed!")
@@ -867,17 +902,55 @@ masterToggleCtl = addToggle(MainTab, "Script Active [Q]", running, function(s)
     end
 end)
 
-addButton(MainTab, "Unload Script [P]", function() unloadScript() end)
+addButton(MainTab, "Unload Script", function() unloadScript() end)
 
 addSection(StandTab, "Wanted Stands")
 for _, stand in ipairs(WANTED_STANDS) do
     addLabel(StandTab, "✓ " .. stand)
 end
 
+addSection(KeybindTab, "Controls")
+local ToggleKeyElement = addLabel(KeybindTab, "Toggle Menu Key: " .. toggleKey.Name)
+local UnloadKeyElement = addLabel(KeybindTab, "Unload Script Key: " .. unloadKey.Name)
+local keybindCaptureActive = false
+
+local function bindKey(kind)
+    if keybindCaptureActive then return end
+    keybindCaptureActive = true
+
+    notify("Keybind Capture", "Press any key to set " .. kind .. " keybind.", 3)
+    local conn
+    conn = UIS.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+        local chosen = input.KeyCode
+        if chosen == Enum.KeyCode.Unknown then return end
+        conn:Disconnect()
+        keybindCaptureActive = false
+
+        if kind == "Toggle" then
+            toggleKey = chosen
+            ToggleKeyElement:Set("Toggle Menu Key: " .. toggleKey.Name)
+            notify("Keybind Updated", "Toggle key is now " .. toggleKey.Name, 3)
+        else
+            unloadKey = chosen
+            UnloadKeyElement:Set("Unload Script Key: " .. unloadKey.Name)
+            notify("Keybind Updated", "Unload key is now " .. unloadKey.Name, 3)
+        end
+    end)
+end
+
+addButton(KeybindTab, "Set Toggle Key", function()
+    bindKey("Toggle")
+end)
+addButton(KeybindTab, "Set Unload Key", function()
+    bindKey("Unload")
+end)
+
 addSection(InfoTab, "About")
 addLabel(InfoTab, "Bridger · Publix Edition")
 addLabel(InfoTab, "Theme: Publix Green")
-addLabel(InfoTab, "Hotkeys: Q = toggle, P = unload")
+addLabel(InfoTab, "Hotkeys can be changed in Keybinds tab")
 addLabel(InfoTab, "Where Shopping is a Pleasure")
 
 -- Start on Main tab
@@ -900,7 +973,7 @@ NotifList.HorizontalAlignment = Enum.HorizontalAlignment.Right
 NotifList.SortOrder = Enum.SortOrder.LayoutOrder
 NotifList.Parent = NotifRoot
 
-local function notify(title, body, duration)
+notify = function(title, body, duration)
     duration = duration or 4
     local card = Instance.new("Frame")
     card.Size = UDim2.new(0, 300, 0, 0)
@@ -1001,6 +1074,18 @@ setStand = function(text)
     print("[Stand] " .. text)
 end
 
+local startClock = os.clock()
+task.spawn(function()
+    while ScreenGui and ScreenGui.Parent do
+        local elapsed = math.max(0, math.floor(os.clock() - startClock))
+        local h = math.floor(elapsed / 3600)
+        local m = math.floor((elapsed % 3600) / 60)
+        local s = elapsed % 60
+        RuntimeElement:Set(string.format("Run Time: %02d:%02d:%02d", h, m, s))
+        task.wait(1)
+    end
+end)
+
 -- ============================================
 -- WINDOW ANIMATIONS
 -- ============================================
@@ -1010,6 +1095,7 @@ local minimized = false
 task.spawn(function()
     task.wait(2.0) -- wait for splash
     tween(Window, BOUNCE, {Size = TARGET_WIN_SIZE})
+    tween(HeaderLogo, SMOOTH, {ImageTransparency = 0})
 end)
 
 local function minimizeWindow()
@@ -1101,8 +1187,8 @@ end
 
 table.insert(connections, UIS.InputBegan:Connect(function(i, gp)
     if gp then return end
-    if i.KeyCode == TOGGLE_KEY then toggleScript() end
-    if i.KeyCode == UNLOAD_KEY then unloadScript() end
+    if i.KeyCode == toggleKey then toggleScript() end
+    if i.KeyCode == unloadKey then unloadScript() end
 end))
 
 -- ============================================
@@ -1483,7 +1569,7 @@ end)
 -- ============================================
 setStatus("Waiting for Play click...")
 print("[Script] Loaded! Q = toggle | P = unload")
-notify("Publix Edition", "Script loaded. Press Q to pause, P to unload.", 5)
+notify("Publix Edition", "Script loaded. Press " .. toggleKey.Name .. " to pause, " .. unloadKey.Name .. " to unload.", 5)
 
 local _ = player.Character or player.CharacterAdded:Wait()
 task.wait(LOAD_WAIT)
