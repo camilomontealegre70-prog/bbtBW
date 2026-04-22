@@ -61,6 +61,7 @@ local THEME = {
     DangerRed       = Color3.fromRGB(200, 60, 60),
     ToggleOff       = Color3.fromRGB(210, 218, 212),
     Divider         = Color3.fromRGB(228, 238, 230),
+    CardBorder      = Color3.fromRGB(222, 234, 224),
 }
 
 local FAST  = TweenInfo.new(0.16, Enum.EasingStyle.Quad,  Enum.EasingDirection.Out)
@@ -424,9 +425,9 @@ HeaderTitle.AnchorPoint = Vector2.new(0, 0.5)
 HeaderTitle.Position = UDim2.new(0, 66, 0.5, -9)
 HeaderTitle.Size = UDim2.new(1, -180, 0, 20)
 HeaderTitle.BackgroundTransparency = 1
-HeaderTitle.Text = "Bridger"
+HeaderTitle.Text = "BRIDGER CONTROL"
 HeaderTitle.Font = Enum.Font.GothamBold
-HeaderTitle.TextSize = 17
+HeaderTitle.TextSize = 15
 HeaderTitle.TextColor3 = THEME.TextOnGreen
 HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
 HeaderTitle.Parent = Header
@@ -436,13 +437,26 @@ HeaderSub.AnchorPoint = Vector2.new(0, 0.5)
 HeaderSub.Position = UDim2.new(0, 66, 0.5, 11)
 HeaderSub.Size = UDim2.new(1, -180, 0, 16)
 HeaderSub.BackgroundTransparency = 1
-HeaderSub.Text = "Publix Edition · Saint Corpse Collector"
+HeaderSub.Text = "Publix Edition  |  Saint Corpse Collector"
 HeaderSub.Font = Enum.Font.Gotham
 HeaderSub.TextSize = 11
 HeaderSub.TextColor3 = Color3.fromRGB(220, 245, 225)
 HeaderSub.TextXAlignment = Enum.TextXAlignment.Left
 HeaderSub.TextTransparency = 0.15
 HeaderSub.Parent = Header
+
+local HeaderBadge = Instance.new("TextLabel")
+HeaderBadge.AnchorPoint = Vector2.new(1, 0.5)
+HeaderBadge.Position = UDim2.new(1, -92, 0.5, 0)
+HeaderBadge.Size = UDim2.new(0, 150, 0, 24)
+HeaderBadge.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+HeaderBadge.BackgroundTransparency = 0.8
+HeaderBadge.Text = "PUBLIX STYLE"
+HeaderBadge.Font = Enum.Font.GothamBold
+HeaderBadge.TextSize = 10
+HeaderBadge.TextColor3 = THEME.TextOnGreen
+HeaderBadge.Parent = Header
+corner(HeaderBadge, 999)
 
 -- Window controls (minimize + close) with circular minimalist style
 local function makeControlBtn(text, xOffset)
@@ -508,6 +522,14 @@ ContentArea.BackgroundColor3 = THEME.LightBG
 ContentArea.BorderSizePixel = 0
 ContentArea.Parent = Window
 
+local contentGrad = Instance.new("UIGradient")
+contentGrad.Rotation = 100
+contentGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(252, 255, 252)),
+    ColorSequenceKeypoint.new(1, THEME.LightBG),
+})
+contentGrad.Parent = ContentArea
+
 local tabs = {}
 local activeTab = nil
 
@@ -522,6 +544,12 @@ local function setActiveTab(tabData)
         })
         tween(t.Label, FAST, {
             TextColor3 = active and THEME.PublixGreen or THEME.TextMid
+        })
+        tween(t.Icon, FAST, {
+            TextColor3 = active and THEME.PublixGreen or THEME.TextMid
+        })
+        tween(t.Stroke, FAST, {
+            Transparency = active and 0.25 or 1
         })
         tween(t.Indicator, SMOOTH, {
             Size = active and UDim2.new(0, 3, 0.6, 0) or UDim2.new(0, 3, 0, 0),
@@ -538,7 +566,7 @@ local function setActiveTab(tabData)
     activeTab = tabData
 end
 
-local function createTab(name)
+local function createTab(name, iconText)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 38)
     btn.BackgroundColor3 = THEME.CardBG
@@ -547,6 +575,8 @@ local function createTab(name)
     btn.Text = ""
     btn.Parent = TabBar
     corner(btn, 10)
+    local btnStroke = stroke(btn, THEME.CardBorder, 1)
+    btnStroke.Transparency = 1
 
     -- Left indicator pill
     local indicator = Instance.new("Frame")
@@ -559,9 +589,20 @@ local function createTab(name)
     indicator.Parent = btn
     corner(indicator, 2)
 
+    local icon = Instance.new("TextLabel")
+    icon.Size = UDim2.new(0, 20, 1, 0)
+    icon.Position = UDim2.new(0, 14, 0, 0)
+    icon.BackgroundTransparency = 1
+    icon.Text = iconText or "[ ]"
+    icon.Font = Enum.Font.GothamBold
+    icon.TextSize = 11
+    icon.TextColor3 = THEME.TextMid
+    icon.TextXAlignment = Enum.TextXAlignment.Left
+    icon.Parent = btn
+
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -16, 1, 0)
-    lbl.Position = UDim2.new(0, 16, 0, 0)
+    lbl.Size = UDim2.new(1, -40, 1, 0)
+    lbl.Position = UDim2.new(0, 32, 0, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = name
     lbl.Font = Enum.Font.GothamMedium
@@ -588,18 +629,20 @@ local function createTab(name)
     list.SortOrder = Enum.SortOrder.LayoutOrder
     list.Parent = page
 
-    local tab = { Button = btn, Label = lbl, Page = page, Indicator = indicator }
+    local tab = { Button = btn, Label = lbl, Icon = icon, Page = page, Indicator = indicator, Stroke = btnStroke }
     table.insert(tabs, tab)
 
     btn.MouseButton1Click:Connect(function() setActiveTab(tab) end)
     btn.MouseEnter:Connect(function()
         if activeTab ~= tab then
             tween(btn, FAST, {BackgroundTransparency = 0.6})
+            tween(btnStroke, FAST, {Transparency = 0.35})
         end
     end)
     btn.MouseLeave:Connect(function()
         if activeTab ~= tab then
             tween(btn, FAST, {BackgroundTransparency = 1})
+            tween(btnStroke, FAST, {Transparency = 1})
         end
     end)
 
@@ -634,6 +677,8 @@ local function addLabel(tab, text)
     holder.BorderSizePixel = 0
     holder.Parent = tab.Page
     corner(holder, 10)
+    local holderStroke = stroke(holder, THEME.CardBorder, 1)
+    holderStroke.Transparency = 0.45
 
     -- Subtle green accent dot
     local dot = Instance.new("Frame")
@@ -670,6 +715,8 @@ local function addToggle(tab, name, initial, callback)
     holder.Text = ""
     holder.Parent = tab.Page
     corner(holder, 10)
+    local holderStroke = stroke(holder, THEME.CardBorder, 1)
+    holderStroke.Transparency = 0.45
 
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, -76, 1, 0)
@@ -728,9 +775,11 @@ local function addToggle(tab, name, initial, callback)
     holder.MouseButton1Click:Connect(function() set(not value) end)
     holder.MouseEnter:Connect(function()
         tween(holder, FAST, {BackgroundColor3 = Color3.fromRGB(250, 254, 250)})
+        tween(holderStroke, FAST, {Transparency = 0.15})
     end)
     holder.MouseLeave:Connect(function()
         tween(holder, FAST, {BackgroundColor3 = THEME.CardBG})
+        tween(holderStroke, FAST, {Transparency = 0.45})
     end)
 
     return {
@@ -750,6 +799,8 @@ local function addButton(tab, name, callback)
     btn.TextColor3 = THEME.TextOnGreen
     btn.Parent = tab.Page
     corner(btn, 10)
+    local btnStroke = stroke(btn, THEME.PublixGreenHi, 1)
+    btnStroke.Transparency = 0.35
 
     local grad = Instance.new("UIGradient")
     grad.Color = ColorSequence.new({
@@ -761,9 +812,11 @@ local function addButton(tab, name, callback)
 
     btn.MouseEnter:Connect(function()
         tween(btn, FAST, {BackgroundColor3 = THEME.PublixGreenLite})
+        tween(btnStroke, FAST, {Transparency = 0.1})
     end)
     btn.MouseLeave:Connect(function()
         tween(btn, FAST, {BackgroundColor3 = THEME.PublixGreen})
+        tween(btnStroke, FAST, {Transparency = 0.35})
     end)
     btn.MouseButton1Down:Connect(function()
         tween(btn, FAST, {BackgroundColor3 = THEME.PublixGreenDim})
@@ -781,9 +834,9 @@ end
 -- ============================================
 -- BUILD TABS
 -- ============================================
-local MainTab  = createTab("Main")
-local StandTab = createTab("Stands")
-local InfoTab  = createTab("About")
+local MainTab  = createTab("Main", "[M]")
+local StandTab = createTab("Stands", "[S]")
+local InfoTab  = createTab("About", "[I]")
 
 addSection(MainTab, "Info")
 local StatusElement = addLabel(MainTab, "Status: Waiting...")
