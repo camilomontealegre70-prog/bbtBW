@@ -978,7 +978,6 @@ local function bindKey(kind)
     if keybindCaptureActive then return end
     keybindCaptureActive = true
     local captureLabel = ({
-        Unload     = "unload script",
         MenuToggle = "open / close menu",
     })[kind] or kind
     notify("Keybind capture", "Press a keyboard key for: " .. captureLabel, 3)
@@ -990,7 +989,7 @@ local function bindKey(kind)
         if chosen == Enum.KeyCode.Unknown then return end
         conn:Disconnect()
         keybindCaptureActive = false
-        elseif kind == "MenuToggle" then
+        if kind == "MenuToggle" then
             menuToggleKey = chosen
             notify("Keybind updated", "Open/close menu key: " .. menuToggleKey.Name, 3)
         end
