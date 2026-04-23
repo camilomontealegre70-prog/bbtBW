@@ -39,7 +39,6 @@ local LOAD_WAIT         = 3
 local MAX_GROUND_DIST   = 15
 local CLOSE_HIT_DIST    = 8
 local MENU_BLUR_SIZE    = 10
-local unloadKey         = Enum.KeyCode.P
 local menuToggleKey     = Enum.KeyCode.RightShift
 
 -- ============================================
@@ -969,7 +968,6 @@ local KeybindReadout = addWrappedNote(KeybindTab, "")
 local function refreshKeybindReadout()
     KeybindReadout:Set(table.concat({
         "• Open / close menu  →  " .. menuToggleKey.Name,
-        "• Unload script      →  " .. unloadKey.Name,
     }, "\n"))
 end
 
@@ -992,9 +990,6 @@ local function bindKey(kind)
         if chosen == Enum.KeyCode.Unknown then return end
         conn:Disconnect()
         keybindCaptureActive = false
-        if kind == "Unload" then
-            unloadKey = chosen
-            notify("Keybind updated", "Unload key: " .. unloadKey.Name, 3)
         elseif kind == "MenuToggle" then
             menuToggleKey = chosen
             notify("Keybind updated", "Open/close menu key: " .. menuToggleKey.Name, 3)
@@ -1004,7 +999,6 @@ local function bindKey(kind)
 end
 
 addButton(KeybindTab, "Set open / close menu key", function() bindKey("MenuToggle") end)
-addButton(KeybindTab, "Set unload key",             function() bindKey("Unload") end)
 refreshKeybindReadout()
 
 -- Stands tab
@@ -1282,7 +1276,6 @@ table.insert(connections, UIS.InputBegan:Connect(function(i, gp)
         syncMenuGuiVisibility()
         return
     end
-    if i.KeyCode == unloadKey then unloadScript() end
 end))
 
 -- ============================================
@@ -1641,12 +1634,8 @@ end)
 -- ENTRY POINT
 -- ============================================
 setStatus("Waiting for Play click...")
-print("[Script] Loaded! RightShift = menu | P = unload")
-notify(
-    "Publix Edition",
-    "RightShift = open/close menu  ·  P = unload",
-    6
-)
+print("[Script] Loaded! RightShift = menu")
+notify(notify("Publix Edition", "RightShift = open/close menu", 6)
 
 local _ = player.Character or player.CharacterAdded:Wait()
 task.wait(LOAD_WAIT)
