@@ -1,6 +1,6 @@
 -- ================================================
 -- Bridger: WESTERN | Saint Corpse Collector
--- PUBLIX THEME Edition | Q = script pause · P = unload · Insert = open/close menu
+-- PUBLIX THEME Edition | P = unload · RightShift = open/close menu
 -- ================================================
 
 repeat task.wait(0.5) until game:IsLoaded()
@@ -39,41 +39,34 @@ local LOAD_WAIT         = 3
 local MAX_GROUND_DIST   = 15
 local CLOSE_HIT_DIST    = 8
 local MENU_BLUR_SIZE    = 10
-local toggleKey         = Enum.KeyCode.Q       -- pause / resume script logic
 local unloadKey         = Enum.KeyCode.P
-local menuToggleKey     = Enum.KeyCode.Insert -- show / hide entire menu UI (change in Keybinds tab)
+local menuToggleKey     = Enum.KeyCode.RightShift
 
 -- ============================================
--- PUBLIX THEME (+ dark “script hub” shell like Cerberus-style UIs)
+-- PUBLIX THEME
 -- ============================================
 local PUBLIX_LOGO_ASSET_ID = "131474144341584"
--- rbxthumb often resolves when rbxassetid thumbnails fail in-game
-local PUBLIX_LOGO_PRIMARY = "rbxthumb://type=Asset&id=" .. PUBLIX_LOGO_ASSET_ID .. "&w=420&h=420"
+local PUBLIX_LOGO_PRIMARY  = "rbxthumb://type=Asset&id=" .. PUBLIX_LOGO_ASSET_ID .. "&w=420&h=420"
 local PUBLIX_LOGO_FALLBACK = "rbxassetid://" .. PUBLIX_LOGO_ASSET_ID
 
 local function applyPublixLogoImage(img)
-    -- Try rbxassetid first (your upload), then rbxthumb (often works when direct image fails)
     img.Image = PUBLIX_LOGO_FALLBACK
-    pcall(function()
-        ContentProvider:PreloadAsync({img})
-    end)
+    pcall(function() ContentProvider:PreloadAsync({img}) end)
     task.delay(0.5, function()
         if img.Parent then
             img.Image = PUBLIX_LOGO_PRIMARY
-            pcall(function()
-                ContentProvider:PreloadAsync({img})
-            end)
+            pcall(function() ContentProvider:PreloadAsync({img}) end)
         end
     end)
 end
 
 local THEME = {
-    PublixGreen     = Color3.fromRGB(0, 122, 51),     -- #007A33 Publix brand green
-    PublixGreenDim  = Color3.fromRGB(0, 92, 38),      -- darker for pressed states
-    PublixGreenLite = Color3.fromRGB(46, 160, 90),    -- accent / hover
-    PublixGreenHi   = Color3.fromRGB(84, 190, 122),   -- gradient highlight
-    LightBG         = Color3.fromRGB(248, 252, 248),  -- near-white with green tint
-    LightBG2        = Color3.fromRGB(238, 246, 238),  -- sidebar / section rows
+    PublixGreen     = Color3.fromRGB(0, 122, 51),
+    PublixGreenDim  = Color3.fromRGB(0, 92, 38),
+    PublixGreenLite = Color3.fromRGB(46, 160, 90),
+    PublixGreenHi   = Color3.fromRGB(84, 190, 122),
+    LightBG         = Color3.fromRGB(248, 252, 248),
+    LightBG2        = Color3.fromRGB(238, 246, 238),
     CardBG          = Color3.fromRGB(255, 255, 255),
     TextDark        = Color3.fromRGB(28, 40, 32),
     TextMid         = Color3.fromRGB(82, 100, 88),
@@ -83,7 +76,6 @@ local THEME = {
     ToggleOff       = Color3.fromRGB(210, 218, 212),
     Divider         = Color3.fromRGB(228, 238, 230),
     CardBorder      = Color3.fromRGB(222, 234, 224),
-    -- Dark shell (Cerebus / exploit-hub style) + Publix accents
     ShellWindow     = Color3.fromRGB(18, 19, 24),
     ShellHeader     = Color3.fromRGB(22, 23, 30),
     ShellSidebar    = Color3.fromRGB(26, 27, 34),
@@ -96,10 +88,10 @@ local THEME = {
     TabText         = Color3.fromRGB(205, 208, 218),
 }
 
-local FAST  = TweenInfo.new(0.16, Enum.EasingStyle.Quad,  Enum.EasingDirection.Out)
-local SMOOTH= TweenInfo.new(0.32, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-local BOUNCE= TweenInfo.new(0.55, Enum.EasingStyle.Back,  Enum.EasingDirection.Out)
-local GLIDE = TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local FAST   = TweenInfo.new(0.16, Enum.EasingStyle.Quad,  Enum.EasingDirection.Out)
+local SMOOTH = TweenInfo.new(0.32, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local BOUNCE = TweenInfo.new(0.55, Enum.EasingStyle.Back,  Enum.EasingDirection.Out)
+local GLIDE  = TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 -- ============================================
 -- STATE
@@ -113,18 +105,16 @@ local pendingPart      = nil
 local connections      = {}
 local char, hrp, hum
 
--- Stands the script treats as “wanted” (editable in Stands tab)
 local selectedStands = {}
 for _, s in ipairs(WANTED_STANDS) do
     selectedStands[s] = true
 end
 
-local menuGuiOpen      = true
-local menuGuiWasMinimized = false
-local lastMenuToggleClock = 0
-local MENU_TOGGLE_DEBOUNCE = 0.22
+local menuGuiOpen             = true
+local menuGuiWasMinimized     = false
+local lastMenuToggleClock     = 0
+local MENU_TOGGLE_DEBOUNCE    = 0.22
 
--- Forward declarations (must exist as upvalues before any closure references them)
 local runStartupScan
 local unloadScript
 local setStatus
@@ -167,10 +157,9 @@ local function padding(parent, p)
 end
 
 -- ============================================
--- SCREEN GUI (parent)
+-- SCREEN GUI
 -- ============================================
 local playerGui = player:WaitForChild("PlayerGui")
--- Remove any previous instance
 pcall(function()
     local old = playerGui:FindFirstChild("BridgerPublix")
     if old then old:Destroy() end
@@ -184,7 +173,7 @@ ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = playerGui
 
 -- ============================================
--- MENU BACKDROP (blur + ambient gradient)
+-- MENU BACKDROP
 -- ============================================
 local menuBlur = Lighting:FindFirstChild("BridgerMenuBlur") or Instance.new("BlurEffect")
 menuBlur.Name = "BridgerMenuBlur"
@@ -204,9 +193,9 @@ Backdrop.Parent = ScreenGui
 local backdropGrad = Instance.new("UIGradient")
 backdropGrad.Rotation = 115
 backdropGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(10, 36, 18)),
-    ColorSequenceKeypoint.new(0.45, Color3.fromRGB(8, 20, 12)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(4, 12, 7)),
+    ColorSequenceKeypoint.new(0,    Color3.fromRGB(10, 36, 18)),
+    ColorSequenceKeypoint.new(0.45, Color3.fromRGB(8,  20, 12)),
+    ColorSequenceKeypoint.new(1,    Color3.fromRGB(4,  12, 7)),
 })
 backdropGrad.Transparency = NumberSequence.new({
     NumberSequenceKeypoint.new(0, 0.15),
@@ -235,17 +224,15 @@ ambientOrbB.Parent = Backdrop
 corner(ambientOrbB, 999)
 
 -- ============================================
--- LOADING SPLASH (blur bg + spinning logo)
+-- LOADING SPLASH
 -- ============================================
 local function showSplash()
-    -- Lighting blur on the game world
     local blur = Lighting:FindFirstChild("BridgerBlur") or Instance.new("BlurEffect")
     blur.Name = "BridgerBlur"
     blur.Size = 0
     blur.Parent = Lighting
     tween(blur, GLIDE, {Size = 24})
 
-    -- Full-screen dim overlay with subtle green tint
     local splash = Instance.new("Frame")
     splash.Name = "Splash"
     splash.Size = UDim2.new(1, 0, 1, 0)
@@ -256,7 +243,6 @@ local function showSplash()
     splash.Parent = ScreenGui
     tween(splash, GLIDE, {BackgroundTransparency = 0.35})
 
-    -- Glass card
     local card = Instance.new("Frame")
     card.Name = "Card"
     card.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -270,7 +256,6 @@ local function showSplash()
     corner(card, 24)
     stroke(card, THEME.PublixGreen, 1).Transparency = 0.55
 
-    -- Logo (ring drawn first so it sits behind the image)
     local logoHolder = Instance.new("Frame")
     logoHolder.AnchorPoint = Vector2.new(0.5, 0.5)
     logoHolder.Position = UDim2.new(0.5, 0, 0.5, -28)
@@ -305,7 +290,6 @@ local function showSplash()
     logo.Parent = logoHolder
     corner(logo, 14)
 
-    -- Title + subtitle
     local title = Instance.new("TextLabel")
     title.AnchorPoint = Vector2.new(0.5, 0)
     title.Position = UDim2.new(0.5, 0, 1, -84)
@@ -332,7 +316,6 @@ local function showSplash()
     subtitle.ZIndex = 103
     subtitle.Parent = card
 
-    -- Progress bar
     local barBG = Instance.new("Frame")
     barBG.AnchorPoint = Vector2.new(0.5, 1)
     barBG.Position = UDim2.new(0.5, 0, 1, -22)
@@ -364,7 +347,6 @@ local function showSplash()
     loadingText.ZIndex = 104
     loadingText.Parent = card
 
-    -- Gradient on progress bar
     local barGrad = Instance.new("UIGradient")
     barGrad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, THEME.PublixGreen),
@@ -372,15 +354,15 @@ local function showSplash()
     })
     barGrad.Parent = barFG
 
-    -- Animate in
     tween(card, BOUNCE, {Size = UDim2.new(0, 340, 0, 280)})
     task.wait(0.2)
     logo.Size = UDim2.new(0.55, 0, 0.55, 0)
-    tween(logo,     SMOOTH, {ImageTransparency = 0})
-    tween(logo,     BOUNCE, {Size = UDim2.new(1, 0, 1, 0)})
-    tween(title,    SMOOTH, {TextTransparency = 0})
-    tween(subtitle, SMOOTH, {TextTransparency = 0})
+    tween(logo,        SMOOTH, {ImageTransparency = 0})
+    tween(logo,        BOUNCE, {Size = UDim2.new(1, 0, 1, 0)})
+    tween(title,       SMOOTH, {TextTransparency = 0})
+    tween(subtitle,    SMOOTH, {TextTransparency = 0})
     tween(loadingText, SMOOTH, {TextTransparency = 0})
+
     task.spawn(function()
         for pct = 0, 100, 5 do
             if not splash.Parent then return end
@@ -391,15 +373,13 @@ local function showSplash()
     end)
 
     task.wait(1.8)
-
-    -- Animate out
-    tween(splash, SMOOTH, {BackgroundTransparency = 1})
-    tween(card,   SMOOTH, {Size = UDim2.new(0, 0, 0, 0)})
-    tween(logo,   FAST,   {ImageTransparency = 1})
-    tween(title,  FAST,   {TextTransparency = 1})
-    tween(subtitle, FAST, {TextTransparency = 1})
-    tween(loadingText, FAST, {TextTransparency = 1})
-    tween(blur,   GLIDE,  {Size = 0})
+    tween(splash,      SMOOTH, {BackgroundTransparency = 1})
+    tween(card,        SMOOTH, {Size = UDim2.new(0, 0, 0, 0)})
+    tween(logo,        FAST,   {ImageTransparency = 1})
+    tween(title,       FAST,   {TextTransparency = 1})
+    tween(subtitle,    FAST,   {TextTransparency = 1})
+    tween(loadingText, FAST,   {TextTransparency = 1})
+    tween(blur,        GLIDE,  {Size = 0})
     task.wait(0.45)
     splash:Destroy()
     pcall(function() blur:Destroy() end)
@@ -408,24 +388,22 @@ end
 task.spawn(showSplash)
 
 -- ============================================
--- MAIN WINDOW (modern + sleek)
+-- MAIN WINDOW
 -- ============================================
 local Window = Instance.new("Frame")
 Window.Name = "Window"
 Window.AnchorPoint = Vector2.new(0.5, 0.5)
 Window.Position = UDim2.new(0.5, 0, 0.5, 0)
-Window.Size = UDim2.new(0, 0, 0, 0) -- animated in
+Window.Size = UDim2.new(0, 0, 0, 0)
 Window.BackgroundColor3 = THEME.ShellWindow
 Window.BorderSizePixel = 0
 Window.ClipsDescendants = true
 Window.Parent = ScreenGui
 corner(Window, 20)
 
--- Accent outline (script-hub style)
 local winStroke = stroke(Window, THEME.PublixGreen, 1)
 winStroke.Transparency = 0.65
 
--- Soft drop shadow (outside the window)
 local shadow = Instance.new("ImageLabel")
 shadow.Name = "Shadow"
 shadow.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -441,7 +419,7 @@ shadow.ZIndex = 0
 shadow.Parent = Window
 
 -- ============================================
--- HEADER (gradient + logo + title)
+-- HEADER
 -- ============================================
 local Header = Instance.new("Frame")
 Header.Name = "Header"
@@ -451,7 +429,6 @@ Header.BorderSizePixel = 0
 Header.Parent = Window
 corner(Header, 20)
 
--- Subtle depth on dark header
 local headerGrad = Instance.new("UIGradient")
 headerGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(34, 36, 46)),
@@ -460,7 +437,6 @@ headerGrad.Color = ColorSequence.new({
 headerGrad.Rotation = 90
 headerGrad.Parent = Header
 
--- Publix accent strip (Cerberus-style top bar accent)
 local HeaderAccent = Instance.new("Frame")
 HeaderAccent.Name = "Accent"
 HeaderAccent.Position = UDim2.new(0, 0, 1, -2)
@@ -469,7 +445,6 @@ HeaderAccent.BackgroundColor3 = THEME.PublixGreen
 HeaderAccent.BorderSizePixel = 0
 HeaderAccent.Parent = Header
 
--- Logo only (wordmark is in title area — avoids overlapping “BRIDGER CONTROL”)
 local HeaderLogo = Instance.new("ImageLabel")
 HeaderLogo.Name = "Logo"
 HeaderLogo.AnchorPoint = Vector2.new(0, 0.5)
@@ -524,7 +499,6 @@ corner(HeaderBadge, 999)
 local badgeStroke = stroke(HeaderBadge, THEME.PublixGreen, 1)
 badgeStroke.Transparency = 0.55
 
--- Window controls (minimize + close) with circular minimalist style
 local function makeControlBtn(text, xOffset)
     local b = Instance.new("TextButton")
     b.AnchorPoint = Vector2.new(1, 0.5)
@@ -541,6 +515,7 @@ local function makeControlBtn(text, xOffset)
     corner(b, 999)
     return b
 end
+
 local MinBtn   = makeControlBtn("–", -52)
 local CloseBtn = makeControlBtn("×", -16)
 
@@ -554,21 +529,19 @@ for _, btn in ipairs({CloseBtn, MinBtn}) do
 end
 
 -- ============================================
--- SIDEBAR (tabs)
+-- SIDEBAR
 -- ============================================
 local TabBar = Instance.new("Frame")
 TabBar.Name = "TabBar"
 TabBar.Position = UDim2.new(0, 0, 0, 64)
 TabBar.Size = UDim2.new(0, 160, 1, -64)
 TabBar.BackgroundColor3 = THEME.ShellSidebar
-TabBar.BackgroundTransparency = 0
 TabBar.BorderSizePixel = 0
 TabBar.ZIndex = 3
 TabBar.ClipsDescendants = false
 TabBar.Parent = Window
 corner(TabBar, 20)
 
--- Right-edge divider
 local TabDivider = Instance.new("Frame")
 TabDivider.AnchorPoint = Vector2.new(1, 0)
 TabDivider.Position = UDim2.new(1, 0, 0, 0)
@@ -633,15 +606,9 @@ local function setActiveTab(tabData)
             BackgroundTransparency = active and 0.28 or 0.9,
             BackgroundColor3 = THEME.ShellCard,
         })
-        tween(t.Label, FAST, {
-            TextColor3 = active and THEME.PublixGreenLite or THEME.TabText
-        })
-        tween(t.Icon, FAST, {
-            TextColor3 = active and THEME.PublixGreenLite or THEME.TabText
-        })
-        tween(t.Stroke, FAST, {
-            Transparency = active and 0.25 or 1
-        })
+        tween(t.Label, FAST, {TextColor3 = active and THEME.PublixGreenLite or THEME.TabText})
+        tween(t.Icon,  FAST, {TextColor3 = active and THEME.PublixGreenLite or THEME.TabText})
+        tween(t.Stroke, FAST, {Transparency = active and 0.25 or 1})
         tween(t.Indicator, SMOOTH, {
             Size = active and UDim2.new(0, 3, 0.6, 0) or UDim2.new(0, 3, 0, 0),
             BackgroundTransparency = active and 0 or 1,
@@ -672,7 +639,6 @@ local function createTab(name, iconText)
     local btnStroke = stroke(btn, THEME.ShellLine, 1)
     btnStroke.Transparency = 1
 
-    -- Left indicator pill
     local indicator = Instance.new("Frame")
     indicator.AnchorPoint = Vector2.new(0, 0.5)
     indicator.Position = UDim2.new(0, 0, 0.5, 0)
@@ -725,7 +691,7 @@ local function createTab(name, iconText)
     list.SortOrder = Enum.SortOrder.LayoutOrder
     list.Parent = page
 
-    local tab = { Button = btn, Label = lbl, Icon = icon, Page = page, Indicator = indicator, Stroke = btnStroke }
+    local tab = {Button = btn, Label = lbl, Icon = icon, Page = page, Indicator = indicator, Stroke = btnStroke}
     table.insert(tabs, tab)
 
     btn.MouseButton1Click:Connect(function() setActiveTab(tab) end)
@@ -746,7 +712,7 @@ local function createTab(name, iconText)
 end
 
 -- ============================================
--- CONTROL BUILDERS (modern / sleek)
+-- CONTROL BUILDERS
 -- ============================================
 local function addWrappedNote(tab, text)
     local holder = Instance.new("Frame")
@@ -774,9 +740,7 @@ local function addWrappedNote(tab, text)
     lbl.TextWrapped = true
     lbl.Parent = holder
 
-    return {
-        Set = function(_, t) lbl.Text = t end,
-    }
+    return { Set = function(_, t) lbl.Text = t end }
 end
 
 local function addSection(tab, title)
@@ -807,7 +771,6 @@ local function addLabel(tab, text)
     local holderStroke = stroke(holder, THEME.ShellLine, 1)
     holderStroke.Transparency = 0.55
 
-    -- Subtle green accent dot
     local dot = Instance.new("Frame")
     dot.AnchorPoint = Vector2.new(0, 0.5)
     dot.Position = UDim2.new(0, 14, 0.5, 0)
@@ -828,10 +791,7 @@ local function addLabel(tab, text)
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = holder
 
-    return {
-        Set = function(_, t) lbl.Text = t end,
-        _label = lbl,
-    }
+    return { Set = function(_, t) lbl.Text = t end, _label = lbl }
 end
 
 local function addToggle(tab, name, initial, callback)
@@ -856,7 +816,6 @@ local function addToggle(tab, name, initial, callback)
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = holder
 
-    -- iOS-style track
     local track = Instance.new("Frame")
     track.AnchorPoint = Vector2.new(1, 0.5)
     track.Position = UDim2.new(1, -14, 0.5, 0)
@@ -874,7 +833,6 @@ local function addToggle(tab, name, initial, callback)
     knob.Parent = track
     corner(knob, 999)
 
-    -- Tiny knob shadow
     local knobShadow = Instance.new("ImageLabel")
     knobShadow.AnchorPoint = Vector2.new(0.5, 0.5)
     knobShadow.Position = UDim2.new(0.5, 0, 0.5, 1)
@@ -961,14 +919,14 @@ end
 -- ============================================
 -- BUILD TABS
 -- ============================================
-local MainTab    = createTab("Main", "[M]")
+local MainTab    = createTab("Main",     "[M]")
 local KeybindTab = createTab("Keybinds", "[K]")
-local StandTab   = createTab("Stands", "[S]")
-local InfoTab    = createTab("About", "[I]")
+local StandTab   = createTab("Stands",   "[S]")
+local InfoTab    = createTab("About",    "[I]")
 
 addSection(MainTab, "Info")
-local StatusElement = addLabel(MainTab, "Status: Waiting...")
-local StandElement  = addLabel(MainTab, "Last Stand: None")
+local StatusElement  = addLabel(MainTab, "Status: Waiting...")
+local StandElement   = addLabel(MainTab, "Last Stand: None")
 local RuntimeElement = addLabel(MainTab, "Run Time: 00:00:00")
 
 addSection(MainTab, "Selected stands")
@@ -977,12 +935,10 @@ local SelectedStandsElement = addWrappedNote(MainTab, "")
 local function refreshSelectedStandsSummary()
     local names = {}
     for _, s in ipairs(WANTED_STANDS) do
-        if selectedStands[s] then
-            table.insert(names, s)
-        end
+        if selectedStands[s] then table.insert(names, s) end
     end
     if #names == 0 then
-        SelectedStandsElement:Set("None selected. The script will not treat any roll as “wanted” until you enable at least one stand in the Stands tab.")
+        SelectedStandsElement:Set("None selected.")
     else
         SelectedStandsElement:Set("Wanted when rolled:\n" .. table.concat(names, ", "))
     end
@@ -990,43 +946,30 @@ end
 refreshSelectedStandsSummary()
 
 addSection(MainTab, "Features")
-local collectorToggleCtl
-collectorToggleCtl = addToggle(MainTab, "Auto Collector", collectorEnabled, function(s)
+addToggle(MainTab, "Auto Collector", collectorEnabled, function(s)
     collectorEnabled = s
     print("[GUI] Collector: " .. (s and "ON" or "OFF"))
 end)
 
-local wipeToggleCtl = addToggle(MainTab, "Auto Wipe", autoWipeEnabled, function(s)
+addToggle(MainTab, "Auto Wipe", autoWipeEnabled, function(s)
     autoWipeEnabled = s
     print("[GUI] Auto Wipe: " .. (s and "ON" or "OFF"))
 end)
 
 addSection(MainTab, "Control")
-local masterToggleCtl
-masterToggleCtl = addToggle(MainTab, "Script Active", running, function(s)
-    running = s
-    if running then
-        setStatus("Resumed!")
-        task.spawn(function() runStartupScan() end)
-    else
-        processing = false
-        setStatus("Paused")
-    end
-end)
-
 addButton(MainTab, "Unload Script", function() unloadScript() end)
 
+-- Keybinds tab
 addSection(KeybindTab, "Open / close menu")
-addWrappedNote(KeybindTab, "Toggles the whole Bridger window (backdrop + UI). Change the key below if Insert conflicts with your game.")
+addWrappedNote(KeybindTab, "Toggles the whole Bridger window. Change the key below if RightShift conflicts.")
 
 addSection(KeybindTab, "Current keys")
 local KeybindReadout = addWrappedNote(KeybindTab, "")
 
 local function refreshKeybindReadout()
     KeybindReadout:Set(table.concat({
-        "• Open / close menu     →  " .. menuToggleKey.Name,
-        "• Script pause / resume →  " .. toggleKey.Name,
-        "• Unload script         →  " .. unloadKey.Name,
+        "• Open / close menu  →  " .. menuToggleKey.Name,
+        "• Unload script      →  " .. unloadKey.Name,
     }, "\n"))
 end
 
@@ -1036,10 +979,8 @@ local keybindCaptureActive = false
 local function bindKey(kind)
     if keybindCaptureActive then return end
     keybindCaptureActive = true
-
     local captureLabel = ({
-        ScriptToggle = "script pause / resume",
-        Unload = "unload script",
+        Unload     = "unload script",
         MenuToggle = "open / close menu",
     })[kind] or kind
     notify("Keybind capture", "Press a keyboard key for: " .. captureLabel, 3)
@@ -1051,11 +992,7 @@ local function bindKey(kind)
         if chosen == Enum.KeyCode.Unknown then return end
         conn:Disconnect()
         keybindCaptureActive = false
-
-        if kind == "ScriptToggle" then
-            toggleKey = chosen
-            notify("Keybind updated", "Script pause key: " .. toggleKey.Name, 3)
-        elseif kind == "Unload" then
+        if kind == "Unload" then
             unloadKey = chosen
             notify("Keybind updated", "Unload key: " .. unloadKey.Name, 3)
         elseif kind == "MenuToggle" then
@@ -1066,21 +1003,13 @@ local function bindKey(kind)
     end)
 end
 
-addButton(KeybindTab, "Set open / close menu key", function()
-    bindKey("MenuToggle")
-end)
-addButton(KeybindTab, "Set script pause key", function()
-    bindKey("ScriptToggle")
-end)
-addButton(KeybindTab, "Set unload key", function()
-    bindKey("Unload")
-end)
-
+addButton(KeybindTab, "Set open / close menu key", function() bindKey("MenuToggle") end)
+addButton(KeybindTab, "Set unload key",             function() bindKey("Unload") end)
 refreshKeybindReadout()
 
+-- Stands tab
 addSection(StandTab, "Stand filter")
-addWrappedNote(StandTab, "Turn stands ON to count as wanted when you roll. OFF = unwanted (auto-wipe can still apply).")
-
+addWrappedNote(StandTab, "Turn stands ON to count as wanted when you roll.")
 addSection(StandTab, "Select stands")
 for _, stand in ipairs(WANTED_STANDS) do
     addToggle(StandTab, stand, selectedStands[stand], function(on)
@@ -1089,13 +1018,13 @@ for _, stand in ipairs(WANTED_STANDS) do
     end)
 end
 
+-- Info tab
 addSection(InfoTab, "About")
 addLabel(InfoTab, "Bridger · Publix Edition")
 addLabel(InfoTab, "Theme: Publix Green")
 addLabel(InfoTab, "Use the Keybinds tab to see and change hotkeys.")
 addLabel(InfoTab, "Where Shopping is a Pleasure")
 
--- Start on Main tab
 setActiveTab(MainTab)
 
 -- ============================================
@@ -1128,7 +1057,6 @@ notify = function(title, body, duration)
     local s = stroke(card, THEME.ShellLine, 1)
     s.Transparency = 0.45
 
-    -- Soft shadow
     local sh = Instance.new("ImageLabel")
     sh.AnchorPoint = Vector2.new(0.5, 0.5)
     sh.Position = UDim2.new(0.5, 0, 0.5, 6)
@@ -1194,7 +1122,6 @@ notify = function(title, body, duration)
     spacer.BackgroundTransparency = 1
     spacer.Parent = card
 
-    -- slide in
     tween(card, GLIDE, {Position = UDim2.new(1, 0, 0, 0)})
     task.delay(duration, function()
         local out = TweenService:Create(card, SMOOTH, {Position = UDim2.new(1, 320, 0, 0)})
@@ -1243,15 +1170,13 @@ local function setMenuBackdropExpanded(expanded)
         tween(menuBlur, FAST, {Size = 0})
         tween(Backdrop, FAST, {BackgroundTransparency = 1})
         task.delay(0.35, function()
-            if Backdrop.Parent then
-                Backdrop.Visible = false
-            end
+            if Backdrop.Parent then Backdrop.Visible = false end
         end)
     end
 end
 
 task.spawn(function()
-    task.wait(2.0) -- wait for splash
+    task.wait(2.0)
     if menuGuiOpen then
         tween(Window, BOUNCE, {Size = TARGET_WIN_SIZE})
         tween(HeaderLogo, SMOOTH, {ImageTransparency = 0})
@@ -1287,20 +1212,9 @@ local function syncMenuGuiVisibility()
     end
 end
 
-local function closeWindow()
-    tween(Window, SMOOTH, {Size = UDim2.new(0, 0, 0, 0)})
-end
-
-local function openWindow()
-    minimized = false
-    menuGuiWasMinimized = false
-    menuGuiOpen = true
-    syncMenuGuiVisibility()
-end
-
 MinBtn.MouseButton1Click:Connect(minimizeWindow)
 CloseBtn.MouseButton1Click:Connect(function()
-    closeWindow()
+    tween(Window, SMOOTH, {Size = UDim2.new(0, 0, 0, 0)})
     task.wait(0.4)
     unloadScript()
 end)
@@ -1311,22 +1225,27 @@ end)
 do
     local dragging, dragStart, startPos
     Header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or
+           input.UserInputType == Enum.UserInputType.Touch then
+            dragging  = true
             dragStart = input.Position
-            startPos = Window.Position
+            startPos  = Window.Position
         end
     end)
     Header.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or
+           input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
         end
     end)
     UIS.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or
+                         input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
-            Window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                                        startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            Window.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
         end
     end)
 end
@@ -1338,15 +1257,11 @@ unloadScript = function()
     running = false
     processing = false
     print("[Script] Unloading...")
-
     for _, conn in ipairs(connections) do
         pcall(function() conn:Disconnect() end)
     end
     connections = {}
-
-    pcall(function()
-        tween(Window, SMOOTH, {Size = UDim2.new(0, 0, 0, 0)})
-    end)
+    pcall(function() tween(Window, SMOOTH, {Size = UDim2.new(0, 0, 0, 0)}) end)
     task.wait(0.4)
     pcall(function() menuBlur:Destroy() end)
     pcall(function() ScreenGui:Destroy() end)
@@ -1354,20 +1269,8 @@ unloadScript = function()
 end
 
 -- ============================================
--- TOGGLE
+-- KEYBIND HANDLER
 -- ============================================
-local function toggleScript()
-    running = not running
-    masterToggleCtl:Set(running)
-    if running then
-        setStatus("Resumed!")
-        task.spawn(function() runStartupScan() end)
-    else
-        processing = false
-        setStatus("Paused")
-    end
-end
-
 table.insert(connections, UIS.InputBegan:Connect(function(i, gp)
     if gp then return end
     if i.UserInputType ~= Enum.UserInputType.Keyboard then return end
@@ -1379,8 +1282,6 @@ table.insert(connections, UIS.InputBegan:Connect(function(i, gp)
         syncMenuGuiVisibility()
         return
     end
-    if not menuGuiOpen then return end
-    if i.KeyCode == toggleKey then toggleScript() end
     if i.KeyCode == unloadKey then unloadScript() end
 end))
 
@@ -1423,12 +1324,8 @@ local function isRealPart(obj)
         local result = workspace:Raycast(obj.Position, dir, params)
         if result then
             local dist = (obj.Position - result.Position).Magnitude
-            if dist <= CLOSE_HIT_DIST then
-                closeHits = closeHits + 1
-            end
-            if i == 1 then
-                downDist = obj.Position.Y - result.Position.Y
-            end
+            if dist <= CLOSE_HIT_DIST then closeHits = closeHits + 1 end
+            if i == 1 then downDist = obj.Position.Y - result.Position.Y end
         end
     end
 
@@ -1436,12 +1333,10 @@ local function isRealPart(obj)
         print("[Detector] FAKE — buried (" .. closeHits .. " close hits): " .. obj.Name)
         return false
     end
-
     if not downDist then
         print("[Detector] FAKE — no ground below: " .. obj.Name)
         return false
     end
-
     if downDist > MAX_GROUND_DIST then
         print("[Detector] FAKE — too high (" .. math.floor(downDist) .. "s): " .. obj.Name)
         return false
@@ -1502,10 +1397,7 @@ local function clickWipe()
     while not btn and attempts < 20 do
         attempts = attempts + 1
         for _, o in ipairs(pgui:GetDescendants()) do
-            if o.Name == "WipeButton" and o.Visible then
-                btn = o
-                break
-            end
+            if o.Name == "WipeButton" and o.Visible then btn = o break end
         end
         if not btn then task.wait(0.5) end
     end
@@ -1602,15 +1494,8 @@ local function respawnTo(part)
     hrp.CFrame = CFrame.new(part.Position + Vector3.new(0, 3, 0))
     task.wait(0.3)
 
-    if not part or not part.Parent then
-        processing = false
-        return
-    end
-
-    if part:GetAttribute("BeingPickedUp") then
-        processing = false
-        return
-    end
+    if not part or not part.Parent then processing = false return end
+    if part:GetAttribute("BeingPickedUp") then processing = false return end
 
     watchForStand()
     tryPickup(part)
@@ -1690,9 +1575,7 @@ runStartupScan = function()
         end
     end
 
-    if not found then
-        setStatus("Watching for spawns...")
-    end
+    if not found then setStatus("Watching for spawns...") end
 end
 
 -- ============================================
@@ -1758,10 +1641,10 @@ end)
 -- ENTRY POINT
 -- ============================================
 setStatus("Waiting for Play click...")
-print("[Script] Loaded! Q = toggle | P = unload | " .. menuToggleKey.Name .. " = menu")
+print("[Script] Loaded! RightShift = menu | P = unload")
 notify(
     "Publix Edition",
-    "Keys: " .. menuToggleKey.Name .. " = open/close menu · " .. toggleKey.Name .. " = pause script · " .. unloadKey.Name .. " = unload.",
+    "RightShift = open/close menu  ·  P = unload",
     6
 )
 
