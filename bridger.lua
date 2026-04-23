@@ -34,7 +34,7 @@ local TARGET_PARTS = {
 }
 
 local HOLD_E_INTERVAL   = 0.1
-local FALLBACK_INTERVAL = 5
+local FALLBACK_INTERVAL = 10
 local LOAD_WAIT         = 3
 local MAX_GROUND_DIST   = 15
 local CLOSE_HIT_DIST    = 8
@@ -1281,12 +1281,13 @@ end))
 -- REAL PART VALIDATOR
 -- ============================================
 local function isRealPart(obj)
+    -- Quick name check first before any expensive operations
     if not (obj:IsA("BasePart") or obj:IsA("MeshPart")) then return false end
-
     local nameMatch = false
     for _, n in ipairs(TARGET_PARTS) do
         if obj.Name == n then nameMatch = true break end
     end
+    if not nameMatch then return false end
     if not nameMatch then return false end
     if obj:GetAttribute("IsCorpsePart") ~= true then return false end
     if obj.Parent ~= workspace then return false end
@@ -1600,12 +1601,19 @@ task.spawn(function()
                 hrp = char:FindFirstChild("HumanoidRootPart")
                 hum = char:FindFirstChild("Humanoid")
                 if hrp and hum and hum.Health > 0 then
-                    for _, obj in ipairs(workspace:GetDescendants()) do
-                        if isRealPart(obj) and not watchedParts[obj] then
-                            watchedParts[obj] = true
-                            collect(obj)
-                            break
+                    -- Spread scan across frames instead of all at once
+                    local descendants = workspace:GetDescendants()
+                    local chunkSize = 50
+                    for i = 1, #descendants, chunkSize do
+                        for j = i, math.min(i + chunkSize - 1, #descendants) do
+                            local obj = descendants[j]
+                            if isRealPart(obj) and not watchedParts[obj] then
+                                watchedParts[obj] = true
+                                collect(obj)
+                                break
+                            end
                         end
+                        task.wait() -- yield between chunks to avoid freezing
                     end
                 end
             end
