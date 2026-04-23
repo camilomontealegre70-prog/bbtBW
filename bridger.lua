@@ -1634,7 +1634,7 @@ end)
 -- ============================================
 setStatus("Waiting for Play click...")
 print("[Script] Loaded! RightShift = menu")
-notify(notify("Publix Edition", "RightShift = open/close menu", 6)
+notify("Publix Edition", "RightShift = open/close menu", 6)
 
 local _ = player.Character or player.CharacterAdded:Wait()
 task.wait(LOAD_WAIT)
